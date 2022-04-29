@@ -1,6 +1,5 @@
 import MemMachineClient, { MemMachineAPIError } from '@memmachine/client'
 
-// General error handling function
 function handleError(error: unknown, context?: string) {
   if (error instanceof MemMachineAPIError) {
     console.error(`[MemMachineAPIError]${context ? ' [' + context + ']' : ''}:`, error.message)
@@ -10,9 +9,9 @@ function handleError(error: unknown, context?: string) {
 }
 
 export async function basic() {
-  // Initialize the MemoryClient
+
   const client = new MemMachineClient({
-    base_url: 'http://127.0.0.1:8080/api/v2' // Replace with your actual server address
+    base_url: 'http://127.0.0.1:8080/api/v2' 
   })
   const project = client.project({ org_id: 'my_org', project_id: 'my_project' })
   const memory = project.memory()
@@ -28,7 +27,6 @@ export async function basic() {
     }
   ]
 
-  // Add memories
   console.log('Adding memories...')
   for (const { content, metadata } of memoriesToAdd) {
     try {
@@ -39,7 +37,6 @@ export async function basic() {
     }
   }
 
-  // Search memories
   console.log('Searching memories...')
   const searchQueries = ['What do I like to eat?', 'Tell me about my work']
 
@@ -53,21 +50,17 @@ export async function basic() {
     }
   }
 
-  // Get episodic memory count
   const episodicCount = await project.getEpisodicCount()
   console.log(`Episodic memory count: ${episodicCount}`)
 
-  // List all projects
   const projects = await client.getProjects()
   console.log('All projects:')
   console.dir(projects, { depth: null })
 
-  // Health check
   const healthCheck = await client.healthCheck()
   console.log('Health check:')
   console.dir(healthCheck, { depth: null })
 
-  // Delete project
   await project.delete()
   console.log('Project deleted.')
 }

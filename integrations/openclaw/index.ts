@@ -348,7 +348,7 @@ async function autoCaptureMessages(params: {
   messages: unknown[];
 }): Promise<void> {
   const { api, handle, sessionKey, messages } = params;
-  const recent = messages.slice(-8); // Only consider the last 3 messages for auto-capture
+  const recent = messages.slice(-8); 
   let stored = 0;
 
   for (const msg of recent) {
@@ -366,7 +366,7 @@ async function autoCaptureMessages(params: {
         continue;
       }
       if (text.includes("relevant-memories")) {
-        continue; // Skip system-inserted recall contexts
+        continue; 
       }
       try {
         await handle.memory.add(text, {
@@ -401,7 +401,6 @@ const memmachinePlugin = {
   register(api: OpenClawPluginApi) {
     const cfg = resolvePluginConfig(api);
 
-    // Tools
     api.registerTool(
       (ctx) => ({
         name: "memory_search",
@@ -606,7 +605,6 @@ const memmachinePlugin = {
       { name: "memory_forget" },
     );
 
-    // CLI commands
     api.registerCli(
       ({ program, logger }) => {
         const root = program.command("memmachine").description("MemMachine commands");
@@ -671,7 +669,6 @@ const memmachinePlugin = {
       { commands: ["memmachine"] },
     );
 
-    // Hooks
     if (cfg.autoRecall) {
       api.on("before_agent_start", async (event, ctx) => {
         if (!event.prompt || event.prompt.trim().length < 3) {
@@ -727,7 +724,6 @@ const memmachinePlugin = {
       });
     }
 
-    // Service
     api.registerService({
       id: "openclaw-memmachine",
       start: () => {

@@ -35,7 +35,7 @@ describe('MemMachine Memory', () => {
     const client = new MemMachineClient({ api_key: 'test-api-key' })
     const project = client.project(mockProjectContext)
     const memory = project.memory(mockMemoryContext)
-    // @ts-ignore
+
     await expect(memory.add('Test memory content', { role: 'invalid-role' })).rejects.toThrow(
       'Invalid memory role: invalid-role. Valid roles are: user, system, assistant'
     )
@@ -175,7 +175,7 @@ describe('MemMachine Memory', () => {
     const client = new MemMachineClient({ api_key: 'test-api-key' })
     const project = client.project(mockProjectContext)
     const memory = project.memory(mockMemoryContext)
-    // @ts-ignore
+
     await expect(memory.delete('1', 'invalid-type')).rejects.toThrow('Invalid memory type: invalid-type')
   })
 

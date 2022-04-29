@@ -1,4 +1,4 @@
-/* MemMachine Header Styles */
+
 .memmachine-header-wrapper {
     display: flex;
     justify-content: flex-end;
@@ -43,7 +43,7 @@
     height: 22px;
 }
 
-/* Memory Status Indicator */
+
 .memory-status-indicator {
     display: flex;
     justify-content: flex-end;
@@ -59,7 +59,7 @@
     color: #666;
 }
 
-/* Comparison Section Styles */
+
 .comparison-banner {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 1rem;
@@ -86,7 +86,7 @@
     opacity: 0.9;
 }
 
-/* Comparison Header */
+
 .comparison-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 0.75rem 1rem;
@@ -103,7 +103,7 @@
     font-size: 1.2rem;
 }
 
-/* Comparison Panel - MemMachine */
+
 .comparison-panel-memmachine {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
     padding: 1rem;
@@ -127,7 +127,7 @@
     color: #667eea;
 }
 
-/* Comparison Panel - Control */
+
 .comparison-panel-control {
     background: linear-gradient(135deg, rgba(200, 200, 200, 0.1) 0%, rgba(150, 150, 150, 0.1) 100%);
     padding: 1rem;
@@ -140,7 +140,7 @@
     color: #666;
 }
 
-/* Vertical Divider */
+
 .vertical-divider {
     width: 2px;
     background: #e0e0e0;
@@ -148,12 +148,12 @@
     height: 100%;
 }
 
-/* Answer Content */
+
 .answer {
     word-wrap: break-word;
 }
 
-/* Responsive Design */
+
 @media (max-width: 768px) {
     .memmachine-header-wrapper {
         justify-content: center;

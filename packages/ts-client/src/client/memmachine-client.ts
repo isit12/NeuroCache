@@ -6,49 +6,7 @@ import { MemMachineProject, type Project, type ProjectContext } from '@/project'
 import { VERSION } from '@/version'
 import type { ClientOptions, HealthStatus } from './memmachine-client.types'
 
-/**
- * Main API client for interacting with the MemMachine RESTful service.
- *
- * Provides a unified API for memory management, project operations, and server health checks.
- *
- * @remarks
- * Optional {@link ClientOptions}:
- * - `base_url` (default: 'https://api.memmachine.ai/v2')
- * - `api_key`
- * - `timeout` (default: 60000 ms)
- * - `max_retries` (default: 3)
- *
- * Features:
- * - Manage memories using MemMachineMemory instances
- * - Manage projects using MemMachineProject instances
- * - List projects from the MemMachine server
- * - Perform server health checks
- *
- * @example
- * ```typescript
- * import MemMachineClient from '@memmachine/client'
- *
- * async function run() {
- *   const client = new MemMachineClient({ api_key: 'your_api_key' })
- *   const project = client.project({ org_id: 'your_org_id', project_id: 'your_project_id' })
- *   const memory = project.memory()
- *   console.log(memory.getContext())
- *
- *   const projects = await client.getProjects()
- *   console.dir(projects, { depth: null })
- *
- *   const metrics = await client.getMetrics()
- *   console.log(metrics)
- *
- *   const healthStatus = await client.healthCheck()
- *   console.dir(healthStatus, { depth: null })
- * }
- *
- * run()
- * ```
- *
- * @param options - Configuration options for the client, see {@link ClientOptions}.
- */
+
 export class MemMachineClient {
   client: AxiosInstance
 
@@ -79,22 +37,12 @@ export class MemMachineClient {
     })
   }
 
-  /**
-   * Creates a MemMachineProject instance for managing a specific project.
-   *
-   * @param projectContext - Context options for the project.
-   * @returns A MemMachineProject instance.
-   */
+  
   project(projectContext: ProjectContext): MemMachineProject {
     return new MemMachineProject(this.client, projectContext)
   }
 
-  /**
-   * Retrieves a list of all projects accessible to the client.
-   *
-   * @returns A promise that resolves to an array of Project objects.
-   * @throws {@link MemMachineAPIError} if the request fails.
-   */
+  
   async getProjects(): Promise<Project[]> {
     try {
       const response = await this.client.post('/projects/list')
@@ -104,12 +52,7 @@ export class MemMachineClient {
     }
   }
 
-  /**
-   * Retrieves Prometheus metrics from the MemMachine server.
-   *
-   * @returns A promise that resolves to the server metrics.
-   * @throws {@link MemMachineAPIError} if the request fails.
-   */
+  
   async getMetrics(): Promise<string> {
     try {
       const response = await this.client.get('/metrics')
@@ -119,12 +62,7 @@ export class MemMachineClient {
     }
   }
 
-  /**
-   * Checks the health status of the MemMachine server.
-   *
-   * @returns A promise that resolves to the server status information.
-   * @throws {@link MemMachineAPIError} if the request fails.
-   */
+  
   async healthCheck(): Promise<HealthStatus> {
     try {
       const response = await this.client.get('/health')
