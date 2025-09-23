@@ -1,10 +1,13 @@
 ---
 title: "Episodic Memory Manager"
 description: "APIs that call Episodic Memory Manager"
-icon: "list-check"
+icon: "people-group"
 ---
+<a id="memmachine.episodic_memory_manager"></a>
 
-The `EpisodicMemoryManager` provides methods for managing and querying your episodic memory. It's the central class for performing actions like searching for specific episodes.
+# memmachine.episodic\_memory\_manager
+
+Manages the lifecycle and configuration of memory instances.
 
 This module provides the `EpisodicMemoryMemoryManager`, a singleton class that
 acts as a central factory and registry for `EpisodicMemory` objects. It
@@ -19,43 +22,6 @@ is responsible for:
   information.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager"></a>
-
-## Initialization
-
-You can access the `EpisodicMemoryManager` instance through the `episodic_memory_manager` property of your `MemMachineClient`.
-
-```
-from memmachine import MemMachineClient
-
-# Initialize the client with your API key
-client = MemMachineClient(api_key="your_api_key")
-
-# Access the manager instance
-manager = client.episodic_memory_manager
-```
-
-## Searching for Episodes
-
-To find episodes, use the `search_episodes` method. This method allows you to query episodes based on a natural language prompt, returning a list of relevant results.
-
-```
-# Define your search query
-search_query = "Find all episodes related to a team meeting about the Q3 launch."
-
-try:
-    # Perform the search
-    search_results = manager.search_episodes(query=search_query)
-
-    if search_results:
-        print("Found the following episodes:")
-        for episode in search_results:
-            print(f"- Episode ID: {episode.id}, Title: {episode.title}")
-    else:
-        print("No episodes found matching the query.")
-except Exception as e:
-    print(f"Error during episode search: {e}")
-```
-<a id="memmachine.episodic_memory_manager"></a>
 
 ## EpisodicMemoryManager Objects
 
@@ -76,7 +42,7 @@ a way to safely create, access, and close these memory instances.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.__init__"></a>
 
-### \_\_init\_\_
+#### \_\_init\_\_
 
 ```python
 def __init__(config: dict)
@@ -94,7 +60,7 @@ method `create_memory_manager` instead.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.create_episodic_memory_manager"></a>
 
-### create\_episodic\_memory\_manager
+#### create\_episodic\_memory\_manager
 
 ```python
 @classmethod
@@ -120,7 +86,7 @@ exist.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.get_episodic_memory_instance"></a>
 
-### get\_episodic\_memory\_instance
+#### get\_episodic\_memory\_instance
 
 ```python
 async def get_episodic_memory_instance(
@@ -153,7 +119,7 @@ thread-safe.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.delete_context_memory"></a>
 
-### delete\_context\_memory
+#### delete\_context\_memory
 
 ```python
 async def delete_context_memory(context: MemoryContext)
@@ -170,7 +136,7 @@ closed and there are no more active references.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.get_all_sessions"></a>
 
-### get\_all\_sessions
+#### get\_all\_sessions
 
 ```python
 def get_all_sessions() -> list[SessionInfo]
@@ -184,7 +150,7 @@ Retrieves all sessions from the session manager.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.get_user_sessions"></a>
 
-### get\_user\_sessions
+#### get\_user\_sessions
 
 ```python
 def get_user_sessions(user_id: str) -> list[SessionInfo]
@@ -203,7 +169,7 @@ Retrieves all sessions associated with a specific user ID.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.get_agent_sessions"></a>
 
-### get\_agent\_sessions
+#### get\_agent\_sessions
 
 ```python
 def get_agent_sessions(agent_id: str) -> list[SessionInfo]
@@ -222,7 +188,7 @@ Retrieves all sessions associated with a specific agent ID.
 
 <a id="memmachine.episodic_memory_manager.EpisodicMemoryManager.get_group_sessions"></a>
 
-### get\_group\_sessions
+#### get\_group\_sessions
 
 ```python
 def get_group_sessions(group_id: str) -> list[SessionInfo]
@@ -238,3 +204,4 @@ Retrieves all sessions associated with a specific group ID.
 **Returns**:
 
   A list of SessionInfo objects for the given group.
+
