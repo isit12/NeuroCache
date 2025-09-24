@@ -33,22 +33,33 @@ Follow these steps to set up your local development environment:
    manage dependencies.
 
     ```bash
-    python3 -m venv .venv
+    python -m venv .venv
     source .venv/bin/activate
     ```
 
 3. **Install Dependencies:**
 
-    In the project root directory, where the `pyproject.toml` file resides, run:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Install Pre-Commit Hooks:**
 
     ```bash
-    pip install .
+    pip install pre-commit
+    pre-commit install
     ```
+
+    This will install the hooks that automatically check your Python code for
+    formatting and style issues on every commit.
 
 ## 3. Code Style and Quality
 
 The project enforces a strict code style using **Black** for formatting and
-**Ruff** for linting.
+**Ruff** for linting. The pre-commit hooks you installed will automatically run
+these checks on every commit.
+
+- To run all checks manually, use: `pre-commit run --all-files`
 
 ## 4. Testing
 
