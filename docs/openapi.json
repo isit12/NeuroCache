@@ -1,27 +1,32 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.0.0",
   "info": {
     "title": "MemMachine API",
-    "description": "This API provides endpoints for interacting with the Profile Memory and Episodic Memory components of the MemMachine system. It includes REST APIs for core memory functions and a dedicated set of tools for use by Large Language Models.",
+    "description": "API for interacting with MemMachine's Profile and Episodic Memory components.",
     "version": "1.0.0"
   },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
   "tags": [
     {
-      "name": "REST APIs",
-      "description": "Core RESTful endpoints for managing and interacting with MemMachine."
+      "name": "REST API",
+      "description": "Endpoints for direct application-to-system interaction."
     },
     {
-      "name": "MCP APIs",
-      "description": "API tools specifically designed for use by Large Language Models."
+      "name": "MCP",
+      "description": "Simplified endpoints for AI agent and LLM tool use."
     }
   ],
   "paths": {
     "/add_memory": {
       "post": {
         "tags": [
-          "REST APIs"
+          "REST API"
         ],
-        "summary": "Adds a memory episode to both episodic and profile memory.",
+        "summary": "add_memory",
         "description": "This endpoint first retrieves the appropriate episodic memory instance based on the session context (group, agent, user, session IDs). It then adds the episode to the episodic memory. If successful, it also passes the message to the profile memory for ingestion.",
         "requestBody": {
           "required": true,
@@ -35,13 +40,13 @@
         },
         "responses": {
           "200": {
-            "description": "Memory episode added successfully."
+            "description": "Memory episode successfully added."
           },
           "400": {
             "description": "Invalid producer or produced_for IDs."
           },
           "404": {
-            "description": "No matching episodic memory instance found for the provided session context."
+            "description": "No matching episodic memory instance found."
           }
         }
       }
@@ -49,9 +54,9 @@
     "/search_memory": {
       "post": {
         "tags": [
-          "REST APIs"
+          "REST API"
         ],
-        "summary": "Searches for memories across both episodic and profile memory.",
+        "summary": "search_memory",
         "description": "Retrieves the relevant episodic memory instance and then performs concurrent searches in both the episodic memory and the profile memory. The results are combined into a single response object.",
         "requestBody": {
           "required": true,
@@ -65,7 +70,7 @@
         },
         "responses": {
           "200": {
-            "description": "Search results retrieved successfully.",
+            "description": "Search successful.",
             "content": {
               "application/json": {
                 "schema": {
@@ -75,143 +80,7 @@
             }
           },
           "404": {
-            "description": "No matching episodic memory instance found for the provided session context."
-          }
-        }
-      }
-    },
-    "/delete_data": {
-      "post": {
-        "tags": [
-          "RPC APIs"
-        ],
-        "summary": "Delete data for a particular session.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteDataRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Data deleted successfully."
-          },
-          "404": {
-            "description": "No matching episodic memory instance found for the provided session context."
-          }
-        }
-      }
-    },
-    "/sessions": {
-      "get": {
-        "tags": [
-          "REST APIs"
-        ],
-        "summary": "Get all sessions.",
-        "responses": {
-          "200": {
-            "description": "A list of all sessions.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllSessionsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/sessions/{user_id}": {
-      "get": {
-        "tags": [
-          "REST APIs"
-        ],
-        "summary": "Get all sessions for a particular user.",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A list of sessions for the specified user.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllSessionsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/sessions/{group_id}": {
-      "get": {
-        "tags": [
-          "REST APIs"
-        ],
-        "summary": "Get all sessions for a particular group.",
-        "parameters": [
-          {
-            "name": "group_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A list of sessions for the specified group.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllSessionsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/sessions/{agent_id}": {
-      "get": {
-        "tags": [
-          "REST APIs"
-        ],
-        "summary": "Get all sessions for a particular agent.",
-        "parameters": [
-          {
-            "name": "agent_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A list of sessions for the specified agent.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllSessionsResponse"
-                }
-              }
-            }
+            "description": "No matching episodic memory instance found."
           }
         }
       }
@@ -219,10 +88,10 @@
     "/llms/add_memmachine": {
       "post": {
         "tags": [
-          "MCP APIs"
+          "MCP"
         ],
-        "summary": "Add memory to the memmachine memory system.",
-        "description": "This tool is designed to be called by LLMs to add a new memory episode to the system.",
+        "summary": "add_memmachine",
+        "description": "Designed for LLM tool use. This tool simplifies the process for LLMs by taking a single 'content' string as a parameter.",
         "requestBody": {
           "required": true,
           "content": {
@@ -230,49 +99,18 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "session": {
-                    "$ref": "#/components/schemas/SessionData"
-                  },
-                  "producer": {
-                    "type": "string"
-                  },
-                  "produced_for": {
-                    "type": "string"
-                  },
                   "content": {
-                    "type": "string"
-                  },
-                  "episode_type": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The string content of the memory to be added."
                   }
-                },
-                "required": [
-                  "session",
-                  "producer",
-                  "produced_for",
-                  "content",
-                  "episode_type"
-                ]
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Memory added successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "boolean"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid producer or produced_for IDs."
-          },
-          "404": {
-            "description": "No matching episodic memory instance found."
+            "description": "Memory added successfully."
           }
         }
       }
@@ -280,10 +118,10 @@
     "/llms/search_memmachine": {
       "post": {
         "tags": [
-          "MCP APIs"
+          "MCP"
         ],
-        "summary": "Vector search for a memory in the memmachine memory system.",
-        "description": "This tool is designed to be called by LLMs to search for relevant memory context.",
+        "summary": "search_memmachine",
+        "description": "Designed for LLM tool use. This tool is optimized for LLMs to easily find relevant context using a simple 'query' parameter.",
         "requestBody": {
           "required": true,
           "content": {
@@ -291,38 +129,26 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "session": {
-                    "$ref": "#/components/schemas/SessionData"
-                  },
                   "query": {
-                    "type": "string"
-                  },
-                  "limit": {
-                    "type": "integer",
-                    "nullable": true
+                    "type": "string",
+                    "description": "The phrase to search for."
                   }
-                },
-                "required": [
-                  "session",
-                  "query"
-                ]
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Search results, internally separated according to memory source.",
+            "description": "Search successful.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "description": "search results, internally separated according to memory source."
                 }
               }
             }
-          },
-          "404": {
-            "description": "No matching episodic memory instance found."
           }
         }
       }
@@ -330,43 +156,9 @@
   },
   "components": {
     "schemas": {
-      "SessionData": {
-        "type": "object",
-        "title": "SessionData",
-        "properties": {
-          "group_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "agent_id": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "user_id": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "session_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "session_id"
-        ]
-      },
       "NewEpisode": {
         "type": "object",
-        "title": "NewEpisode",
         "properties": {
-          "session": {
-            "$ref": "#/components/schemas/SessionData"
-          },
           "producer": {
             "type": "string"
           },
@@ -374,29 +166,34 @@
             "type": "string"
           },
           "episode_content": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              }
-            ]
+            "type": "string"
           },
           "episode_type": {
             "type": "string"
           },
           "metadata": {
-            "type": "object",
-            "nullable": true,
-            "additionalProperties": true
+            "type": "object"
+          },
+          "group_id": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_id": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "session_id": {
+            "type": "string"
           }
         },
         "required": [
-          "session",
           "producer",
           "produced_for",
           "episode_content",
@@ -405,47 +202,23 @@
       },
       "SearchQuery": {
         "type": "object",
-        "title": "SearchQuery",
         "properties": {
-          "session": {
-            "$ref": "#/components/schemas/SessionData"
-          },
           "query": {
             "type": "string"
           },
-          "filter": {
-            "type": "object",
-            "nullable": true,
-            "additionalProperties": true
-          },
           "limit": {
-            "type": "integer",
-            "nullable": true
-          }
-        },
-        "required": [
-          "session",
-          "query"
-        ]
-      },
-      "SearchResult": {
-        "type": "object",
-        "title": "SearchResult",
-        "properties": {
-          "content": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "required": [
-          "content"
-        ]
-      },
-      "MemorySession": {
-        "type": "object",
-        "title": "MemorySession",
-        "properties": {
-          "user_ids": {
+            "type": "integer"
+          },
+          "group_id": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_id": {
             "type": "array",
             "items": {
               "type": "string"
@@ -453,50 +226,20 @@
           },
           "session_id": {
             "type": "string"
-          },
-          "group_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "agent_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
           }
         },
         "required": [
-          "user_ids",
-          "session_id"
+          "query"
         ]
       },
-      "AllSessionsResponse": {
+      "SearchResult": {
         "type": "object",
-        "title": "AllSessionsResponse",
         "properties": {
-          "sessions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MemorySession"
-            }
+          "content": {
+            "type": "object"
           }
         },
-        "required": [
-          "sessions"
-        ]
-      },
-      "DeleteDataRequest": {
-        "type": "object",
-        "title": "DeleteDataRequest",
-        "properties": {
-          "session": {
-            "$ref": "#/components/schemas/SessionData"
-          }
-        },
-        "required": [
-          "session"
-        ]
+        "description": "Response model for memory search results."
       }
     }
   }
