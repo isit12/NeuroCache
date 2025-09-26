@@ -1,20 +1,28 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "MemMachine API",
-    "version": "1.0.0",
-    "description": "API endpoints for interacting with the Profile Memory and Episodic Memory components of the MemMachine memory system."
+    "description": "This API provides endpoints for interacting with the Profile Memory and Episodic Memory components of the MemMachine system. It includes REST APIs for core memory functions and a dedicated set of tools for use by Large Language Models.",
+    "version": "1.0.0"
   },
-  "servers": [
+  "tags": [
     {
-      "url": "https://localhost:8000"
+      "name": "REST APIs",
+      "description": "Core RESTful endpoints for managing and interacting with MemMachine."
+    },
+    {
+      "name": "MCP APIs",
+      "description": "API tools specifically designed for use by Large Language Models."
     }
   ],
   "paths": {
-    "/add_memory": {
+    "/memory": {
       "post": {
-        "summary": "add_memory",
-        "description": "This endpoint adds a memory episode to the episodic memory and passes the message to the profile memory for ingestion.",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/memory",
+        "description": "This endpoint first retrieves the appropriate episodic memory instance based on the session context (group, agent, user, session IDs). It then adds the episode to the episodic memory. If successful, it also passes the message to the profile memory for ingestion.",
         "requestBody": {
           "required": true,
           "content": {
@@ -27,20 +35,47 @@
         },
         "responses": {
           "200": {
-            "description": "Memory successfully added."
+            "description": "Memory episode added successfully."
           },
           "400": {
-            "description": "Invalid producer or produced_for ID."
+            "description": "Invalid producer or produced_for IDs."
           },
           "404": {
-            "description": "No matching episodic memory instance found."
+            "description": "No matching episodic memory instance found for the provided session context."
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/memory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteDataRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data deleted successfully."
+          },
+          "404": {
+            "description": "No matching episodic memory instance found for the provided session context."
           }
         }
       }
     },
-    "/search_memory": {
+    "/memory/search": {
       "post": {
-        "summary": "search_memory",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/memory/search",
         "description": "Retrieves the relevant episodic memory instance and then performs concurrent searches in both the episodic memory and the profile memory. The results are combined into a single response object.",
         "requestBody": {
           "required": true,
@@ -54,7 +89,7 @@
         },
         "responses": {
           "200": {
-            "description": "Search results returned.",
+            "description": "Search results retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -64,38 +99,17 @@
             }
           },
           "404": {
-            "description": "No matching episodic memory instance found."
-          }
-        }
-      }
-    },
-    "/delete_data": {
-      "post": {
-        "summary": "delete_data",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeleteDataRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Session data successfully deleted."
-          },
-          "404": {
-            "description": "No matching episodic memory instance found."
+            "description": "No matching episodic memory instance found for the provided session context."
           }
         }
       }
     },
     "/sessions": {
       "get": {
-        "summary": "sessions",
-        "description": "Retrieves a list of all available memory sessions.",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/sessions",
         "responses": {
           "200": {
             "description": "A list of all sessions.",
@@ -112,7 +126,11 @@
     },
     "/sessions/{user_id}": {
       "get": {
-        "summary": "sessions/{user_id}",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/sessions/{user_id}",
+         "description": "Get all sessions for a particular user.",
         "parameters": [
           {
             "name": "user_id",
@@ -139,7 +157,11 @@
     },
     "/sessions/{group_id}": {
       "get": {
-        "summary": "sessions/{group_id}",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/sessions/{group_id}",
+         "description": "Get all sessions for a particular group.",
         "parameters": [
           {
             "name": "group_id",
@@ -166,7 +188,11 @@
     },
     "/sessions/{agent_id}": {
       "get": {
-        "summary": "sessions/{agent_id}",
+        "tags": [
+          "REST APIs"
+        ],
+        "summary": "/sessions/{agent_id}",
+         "description": "Get all sessions for a particular agent.",
         "parameters": [
           {
             "name": "agent_id",
@@ -190,12 +216,124 @@
           }
         }
       }
+    },
+    "/llms/add_memmachine": {
+      "post": {
+        "tags": [
+          "MCP APIs"
+        ],
+        "summary": "/llms/add_memmachine",
+        "description": "This tool is designed to be called by LLMs to add a new memory episode to the system.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "$ref": "#/components/schemas/SessionData"
+                  },
+                  "producer": {
+                    "type": "string"
+                  },
+                  "produced_for": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "episode_type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session",
+                  "producer",
+                  "produced_for",
+                  "content",
+                  "episode_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Memory added successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid producer or produced_for IDs."
+          },
+          "404": {
+            "description": "No matching episodic memory instance found."
+          }
+        }
+      }
+    },
+    "/llms/search_memmachine": {
+      "post": {
+        "tags": [
+          "MCP APIs"
+        ],
+        "summary": "/llms/search_memmachine",
+        "description": "This tool is designed to be called by LLMs to search for relevant memory context.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "$ref": "#/components/schemas/SessionData"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "session",
+                  "query"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results, internally separated according to memory source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No matching episodic memory instance found."
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "SessionData": {
         "type": "object",
+        "title": "SessionData",
         "properties": {
           "group_id": {
             "type": "string",
@@ -218,10 +356,14 @@
           "session_id": {
             "type": "string"
           }
-        }
+        },
+        "required": [
+          "session_id"
+        ]
       },
       "NewEpisode": {
         "type": "object",
+        "title": "NewEpisode",
         "properties": {
           "session": {
             "$ref": "#/components/schemas/SessionData"
@@ -250,13 +392,21 @@
           },
           "metadata": {
             "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "nullable": true,
+            "additionalProperties": true
           }
-        }
+        },
+        "required": [
+          "session",
+          "producer",
+          "produced_for",
+          "episode_content",
+          "episode_type"
+        ]
       },
       "SearchQuery": {
         "type": "object",
+        "title": "SearchQuery",
         "properties": {
           "session": {
             "$ref": "#/components/schemas/SessionData"
@@ -266,34 +416,35 @@
           },
           "filter": {
             "type": "object",
-            "additionalProperties": true,
-            "nullable": true
+            "nullable": true,
+            "additionalProperties": true
           },
           "limit": {
             "type": "integer",
             "nullable": true
           }
-        }
+        },
+        "required": [
+          "session",
+          "query"
+        ]
       },
       "SearchResult": {
         "type": "object",
+        "title": "SearchResult",
         "properties": {
           "content": {
             "type": "object",
             "additionalProperties": true
           }
-        }
-      },
-      "DeleteDataRequest": {
-        "type": "object",
-        "properties": {
-          "session": {
-            "$ref": "#/components/schemas/SessionData"
-          }
-        }
+        },
+        "required": [
+          "content"
+        ]
       },
       "MemorySession": {
         "type": "object",
+        "title": "MemorySession",
         "properties": {
           "user_ids": {
             "type": "array",
@@ -315,10 +466,15 @@
             },
             "nullable": true
           }
-        }
+        },
+        "required": [
+          "user_ids",
+          "session_id"
+        ]
       },
       "AllSessionsResponse": {
         "type": "object",
+        "title": "AllSessionsResponse",
         "properties": {
           "sessions": {
             "type": "array",
@@ -326,7 +482,22 @@
               "$ref": "#/components/schemas/MemorySession"
             }
           }
-        }
+        },
+        "required": [
+          "sessions"
+        ]
+      },
+      "DeleteDataRequest": {
+        "type": "object",
+        "title": "DeleteDataRequest",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/SessionData"
+          }
+        },
+        "required": [
+          "session"
+        ]
       }
     }
   }
