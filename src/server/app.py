@@ -11,17 +11,19 @@ It includes:
 """
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from dataclasses import dataclass
 import uvicorn
 import yaml
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
@@ -40,6 +42,7 @@ from memmachine.episodic_memory.episodic_memory_manager import (
 from memmachine.profile_memory.profile_memory import ProfileMemory
 
 
+logger = logging.getLogger(__name__)
 # Request session data
 class SessionData(BaseModel):
     """Request model for session information."""
@@ -48,6 +51,23 @@ class SessionData(BaseModel):
     agent_id: list[str] | None
     user_id: list[str] | None
     session_id: str
+
+
+class EpisodeData(BaseModel):
+    """Request model for episode data to create new memories."""
+    producer: str
+    produced_for: str
+    episode_content: str | list[float]
+    episode_type: str
+    metadata: dict[str, Any] | None
+
+
+class SearchRequest(BaseModel):
+    """Request model for searching memories by MCP."""
+    query: str
+    user_id: str | None = None
+    filter: dict[str, Any] | None = None
+    limit: int | None = None
 
 
 # === Request Models ===
@@ -107,9 +127,40 @@ episodic_memory: EpisodicMemoryManager = None
 
 # === Lifespan Management ===
 
+@dataclass
+class DBConfig:
+    """Database configuration model."""
+    host: str | None
+    port: str | None
+    user: str | None
+    password: str | None
+    database: str | None
+
+
+def get_db_config(yaml_config) -> DBConfig:
+    """Helper function to retrieve database configuration."""
+    db_host = os.getenv("POSTGRES_HOST")
+    db_port = os.getenv("POSTGRES_PORT")
+    db_user = os.getenv("POSTGRES_USER")
+    db_pass = os.getenv("POSTGRES_PASS")
+    db_name = os.getenv("POSTGRES_DB")
+    # get DB config from configuration file is available
+    profile_config = yaml_config.get("profile_memory", {})
+    db_config_name = profile_config.get("database")
+    if db_config_name is not None:
+        db_config = yaml_config.get("storage", {})
+        db_config = db_config.get(db_config_name)
+        if db_config is not None:
+            db_host = db_config.get("host", db_host)
+            db_port = db_config.get("port", db_port)
+            db_user = db_config.get("user", db_user)
+            db_pass = db_config.get("password", db_pass)
+            db_name = db_config.get("database", db_name)
+    return DBConfig(db_host, db_port, db_user, db_pass, db_name)
+
 
 @asynccontextmanager
-async def app_lifespan(application: FastAPI):
+async def http_app_lifespan(application: FastAPI):
     """Handles application startup and shutdown events.
 
     Initializes the ProfileMemory and EpisodicMemoryManager instances,
@@ -147,32 +198,17 @@ async def app_lifespan(application: FastAPI):
     prompt_file = yaml_config.get("prompt", {}).get(
         "profile", "profile_prompt"
     )
-    db_host = os.getenv("POSTGRES_HOST")
-    db_port = os.getenv("POSTGRES_PORT")
-    db_user = os.getenv("POSTGRES_USER")
-    db_pass = os.getenv("POSTGRES_PASS")
-    db_name = os.getenv("POSTGRES_DB")
-    # get DB config from configuration file is available
-    db_config_name = profile_config.get("database")
-    if db_config_name is not None:
-        db_config = yaml_config.get("storage", {})
-        db_config = db_config.get(db_config_name)
-        if db_config is not None:
-            db_host = db_config.get("host", db_host)
-            db_port = db_config.get("port", db_port)
-            db_user = db_config.get("user", db_user)
-            db_pass = db_config.get("password", db_pass)
-            db_name = db_config.get("database", db_name)
 
+    db_config = get_db_config(yaml_config)
     profile_memory = ProfileMemory(
         model=llm_model,
         embeddings=embeddings,
         db_config={
-            "host": db_host,
-            "port": db_port,
-            "user": db_user,
-            "password": db_pass,
-            "database": db_name,
+            "host": db_config.host,
+            "port": db_config.port,
+            "user": db_config.user,
+            "password": db_config.password,
+            "database": db_config.database,
         },
         prompt_module=import_module(f".prompt.{prompt_file}", __package__),
     )
@@ -185,89 +221,247 @@ async def app_lifespan(application: FastAPI):
     await profile_memory.cleanup()
     await episodic_memory.shut_down()
 
-
-# Initialize FastMCP for exposing tools to LLMs.
-mcp = FastMCP("memmachine")
-
+mcp = FastMCP("MemMachine")
 mcp_app = mcp.http_app("/mcp")
 
 
 @asynccontextmanager
-async def http_mcp_lifespan(application: FastAPI):
-    """Combines the lifespans of the main app and the MCP app.
+async def mcp_http_lifespan(application: FastAPI):
+    """Manages the combined lifespan of the main app and the MCP app.
 
-    Ensures that both the main application's resources and the FastMCP
-    resources are initialized and cleaned up correctly.
+    This context manager chains the `http_app_lifespan` (for main application
+    resources like memory managers) and the `mcp_app.lifespan` (for
+    MCP-specific resources). It ensures that all resources are initialized on
+    startup and cleaned up on shutdown in the correct order.
 
     Args:
-        app: The FastAPI application instance.
+        application: The FastAPI application instance.
     """
-
-    async with app_lifespan(application):
+    async with http_app_lifespan(application):
         async with mcp_app.lifespan(application):
             yield
 
-
-app = FastAPI(lifespan=http_mcp_lifespan)
-app.mount("/llms", mcp_app)
+app = FastAPI(lifespan=mcp_http_lifespan)
+app.mount("/mcp", mcp_app)
 app.add_route("/metrics", make_asgi_app())
 
 
 @mcp.tool()
-async def add_memmachine(
-    session: SessionData,
-    producer: str,
-    produced_for: str,
-    content: str,
-    episode_type: str,
-):
-    """
-    Add memory to the memmachine memory system
-    Params:
-     - content: str content of memory
-    """
+async def mcp_open_memory(sess: SessionData, ctx: Context):
+    """MCP tool to create and open a memory session.
 
-    new_episode = NewEpisode(
-        session=session,
-        producer=producer,
-        produced_for=produced_for,
-        episode_content=content,
-        episode_type=episode_type,
-        metadata={},
+    This tool establishes a session context for subsequent MCP tool calls.
+    The session data is stored in the MCP context state.
+
+    Args:
+        sess: The session data to establish the context.
+        ctx: The MCP context.
+
+    Returns:
+        True if the session was successfully opened.
+    """
+    ctx.set_state("session_data", sess)
+    return True
+
+
+@mcp.tool()
+async def mcp_close_memory(ctx: Context):
+    """MCP tool to close the currently open memory session.
+
+    This tool retrieves the session data from the MCP context, closes the
+    corresponding episodic memory instance, and clears the session from the
+    context.
+
+    Args:
+        ctx: The MCP context.
+
+    Returns:
+        True if the session was closed successfully, False otherwise.
+    """
+    sess = ctx.get_state("session_data")
+    if sess is None:
+        return False
+    await episodic_memory.close_episodic_memory_instance(
+        group_id=sess.group_id,
+        agent_id=sess.agent_id,
+        user_id=sess.user_id,
+        session_id=sess.session_id,
     )
+    ctx.set_state("session_data", None)
+    return True
 
+
+@mcp.tool()
+async def mcp_add_memory(episode: EpisodeData, ctx: Context):
+    """MCP tool to add a memory episode to the current session.
+
+    This tool requires an open memory session. It adds a new memory episode
+    to the episodic and profile memories associated with the current session.
+
+    Args:
+        episode: The episode data to be added.
+        ctx: The MCP context.
+
+    Returns:
+        True if the memory was added successfully, False otherwise.
+    """
+    sess = ctx.get_state("session_data")
+    if sess is None:
+        return False
+    data = NewEpisode(
+        session=sess,
+        producer=episode.producer,
+        produced_for=episode.produced_for,
+        episode_content=episode.episode_content,
+        episode_type=episode.episode_type,
+        metadata=episode.metadata,
+    )
     try:
-        await add_memory(new_episode)
-    except HTTPException:
+        await add_memory(data)
+    except HTTPException as e:
+        logger.error(e)
         return False
     return True
 
 
 @mcp.tool()
-async def search_memmachine(
-    session: SessionData, query: str, limit: int | None = None
-) -> dict[str, Any]:
-    """
-    Vector search for a memory in the memmachine memory system
-    Params:
-     - query: str phrase to search
+async def mcp_add_session_memory(episode: NewEpisode):
+    """MCP tool to add a memory episode for a specific session.
+
+    This tool does not require a pre-existing open session in the context.
+    It adds a memory episode directly using the session data provided in the
+    `NewEpisode` object.
+
+    Args:
+        episode: The complete new episode data, including session info.
+        ctx: The MCP context (unused).
+
     Returns:
-     - search results, internally separated according to memory source.
+        True if the memory was added successfully, False otherwise.
     """
+    try:
+        await add_memory(episode)
+    except HTTPException as e:
+        logger.error(e)
+        return False
+    return True
 
-    q = SearchQuery(
-        session=session,
-        query=query,
-        limit=limit,
+
+@mcp.tool()
+async def mcp_search_memory(q: SearchRequest, ctx: Context):
+    """MCP tool to search for memories in the current session.
+
+    This tool requires an open memory session. It searches both episodic and
+    profile memories associated with the current session.
+
+    Args:
+        q: The search request containing the query and filters.
+        ctx: The MCP context.
+
+    Returns:
+        A SearchResult object if successful, None otherwise.
+    """
+    sess = ctx.get_state("session_data")
+    if sess is None:
+        return None
+    query = SearchQuery(
+        session=sess,
+        query=q.query,
+        filter=q.filter,
+        limit=q.limit,
     )
+    return await search_memory(query)
 
-    result: SearchResult = await search_memory(q)
-    # Unwrap the result for a simpler return value to the LLM.
-    return result.content
+
+@mcp.tool()
+async def mcp_delete_session_data(sess: SessionData):
+    """MCP tool to delete all data for a specific session.
+
+    This tool does not require a pre-existing open session in the context.
+    It deletes all data associated with the provided session data.
+
+    Args:
+        sess: The session data for which to delete all memories.
+        ctx: The MCP context (unused).
+
+    Returns:
+        True if deletion was successful, False otherwise.
+    """
+    try:
+        await delete_session_data(DeleteDataRequest(session=sess))
+    except HTTPException as e:
+        logger.error(e)
+        return False
+    return True
+
+
+@mcp.tool()
+async def mcp_delete_data(ctx: Context):
+    """MCP tool to delete all data for the current session.
+
+    This tool requires an open memory session. It deletes all data associated
+    with the session stored in the MCP context.
+
+    Args:
+        ctx: The MCP context.
+
+    Returns:
+        True if deletion was successful, False otherwise.
+    """
+    try:
+        sess = ctx.get_state("session_data")
+        if sess is None:
+            return False
+        delete_data_req = DeleteDataRequest(session=sess)
+        await delete_session_data(delete_data_req)
+    except HTTPException as e:
+        logger.error(e)
+        return False
+    return True
+
+
+@mcp.resource("sessions://sessions")
+async def mcp_get_sessions():
+    """MCP resource to retrieve all memory sessions.
+
+    Returns:
+        An AllSessionsResponse containing a list of all sessions.
+    """
+    return get_all_sessions()
+
+
+@mcp.resource("users://{user_id}/sessions")
+async def mcp_get_user_sessions(user_id: str):
+    """MCP resource to retrieve all sessions for a specific user.
+
+    Returns:
+        An AllSessionsResponse containing a list of sessions for the user.
+    """
+    return get_sessions_for_user(user_id)
+
+
+@mcp.resource("groups://{group_id}/sessions")
+async def mcp_get_group_sessions(group_id: str):
+    """MCP resource to retrieve all sessions for a specific group.
+
+    Returns:
+        An AllSessionsResponse containing a list of sessions for the group.
+    """
+    return get_sessions_for_group(group_id)
+
+
+@mcp.resource("agents://{agent_id}/sessions")
+async def mcp_get_agent_sessions(agent_id: str):
+    """MCP resource to retrieve all sessions for a specific agent.
+
+    Returns:
+        An AllSessionsResponse containing a list of sessions for the agent.
+    """
+    return get_sessions_for_agent(agent_id)
 
 
 # === Route Handlers ===
-@app.post("/memory")
+@app.post("/v1/memories")
 async def add_memory(episode: NewEpisode):
     """Adds a memory episode to both episodic and profile memory.
 
@@ -330,7 +524,7 @@ async def add_memory(episode: NewEpisode):
         )
 
 
-@app.post("/memory/search")
+@app.post("/v1/memories/search")
 async def search_memory(q: SearchQuery) -> SearchResult:
     """Searches for memories across both episodic and profile memory.
 
@@ -386,7 +580,7 @@ async def search_memory(q: SearchQuery) -> SearchResult:
         )
 
 
-@app.delete("/memory")
+@app.delete("/v1/memories")
 async def delete_session_data(delete_req: DeleteDataRequest):
     """
     Delete data for a particular session
@@ -407,10 +601,10 @@ async def delete_session_data(delete_req: DeleteDataRequest):
                     {delete_req.session.agent_id}""",
         )
     async with AsyncEpisodicMemory(inst) as inst:
-        inst.delete_data()
+        await inst.delete_data()
 
 
-@app.get("/sessions")
+@app.get("/v1/sessions")
 async def get_all_sessions() -> AllSessionsResponse:
     """
     Get all sessions
@@ -429,7 +623,7 @@ async def get_all_sessions() -> AllSessionsResponse:
     )
 
 
-@app.get("/sessions/{user_id}")
+@app.get("/v1/users/{user_id}/sessions")
 async def get_sessions_for_user(user_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular user
@@ -448,7 +642,7 @@ async def get_sessions_for_user(user_id: str) -> AllSessionsResponse:
     )
 
 
-@app.get("/sessions/{group_id}")
+@app.get("/v1/groups/{group_id}/sessions")
 async def get_sessions_for_group(group_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular group
@@ -467,7 +661,7 @@ async def get_sessions_for_group(group_id: str) -> AllSessionsResponse:
     )
 
 
-@app.get("/sessions/{agent_id}")
+@app.get("/v1/agents/{agent_id}/sessions")
 async def get_sessions_for_agent(agent_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular agent
