@@ -14,12 +14,14 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from importlib import import_module
+from pathlib import Path
 from typing import Any
 
 import uvicorn
 import yaml
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastmcp import FastMCP
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
@@ -107,7 +109,7 @@ episodic_memory: EpisodicMemoryManager = None
 
 
 @asynccontextmanager
-async def http_app_lifespan(application: FastAPI):
+async def app_lifespan(application: FastAPI):
     """Handles application startup and shutdown events.
 
     Initializes the ProfileMemory and EpisodicMemoryManager instances,
@@ -120,7 +122,7 @@ async def http_app_lifespan(application: FastAPI):
     config_file = os.getenv("MEMORY_CONFIG", "cfg.yml")
     try:
         yaml_config = yaml.safe_load(
-            open(config_file, encoding="utf-8")
+            open(Path(__file__).parent / config_file, encoding="utf-8")
         )
     except Exception as e:
         raise e
@@ -183,12 +185,89 @@ async def http_app_lifespan(application: FastAPI):
     await profile_memory.cleanup()
     await episodic_memory.shut_down()
 
-app = FastAPI(lifespan=http_app_lifespan)
+
+# Initialize FastMCP for exposing tools to LLMs.
+mcp = FastMCP("memmachine")
+
+mcp_app = mcp.http_app("/mcp")
+
+
+@asynccontextmanager
+async def http_mcp_lifespan(application: FastAPI):
+    """Combines the lifespans of the main app and the MCP app.
+
+    Ensures that both the main application's resources and the FastMCP
+    resources are initialized and cleaned up correctly.
+
+    Args:
+        app: The FastAPI application instance.
+    """
+
+    async with app_lifespan(application):
+        async with mcp_app.lifespan(application):
+            yield
+
+
+app = FastAPI(lifespan=http_mcp_lifespan)
+app.mount("/llms", mcp_app)
 app.add_route("/metrics", make_asgi_app())
 
 
+@mcp.tool()
+async def add_memmachine(
+    session: SessionData,
+    producer: str,
+    produced_for: str,
+    content: str,
+    episode_type: str,
+):
+    """
+    Add memory to the memmachine memory system
+    Params:
+     - content: str content of memory
+    """
+
+    new_episode = NewEpisode(
+        session=session,
+        producer=producer,
+        produced_for=produced_for,
+        episode_content=content,
+        episode_type=episode_type,
+        metadata={},
+    )
+
+    try:
+        await add_memory(new_episode)
+    except HTTPException:
+        return False
+    return True
+
+
+@mcp.tool()
+async def search_memmachine(
+    session: SessionData, query: str, limit: int | None = None
+) -> dict[str, Any]:
+    """
+    Vector search for a memory in the memmachine memory system
+    Params:
+     - query: str phrase to search
+    Returns:
+     - search results, internally separated according to memory source.
+    """
+
+    q = SearchQuery(
+        session=session,
+        query=query,
+        limit=limit,
+    )
+
+    result: SearchResult = await search_memory(q)
+    # Unwrap the result for a simpler return value to the LLM.
+    return result.content
+
+
 # === Route Handlers ===
-@app.post("/v1/memories")
+@app.post("/memory")
 async def add_memory(episode: NewEpisode):
     """Adds a memory episode to both episodic and profile memory.
 
@@ -251,7 +330,7 @@ async def add_memory(episode: NewEpisode):
         )
 
 
-@app.post("/v1/memories/search")
+@app.post("/memory/search")
 async def search_memory(q: SearchQuery) -> SearchResult:
     """Searches for memories across both episodic and profile memory.
 
@@ -307,7 +386,7 @@ async def search_memory(q: SearchQuery) -> SearchResult:
         )
 
 
-@app.delete("/v1/memories")
+@app.delete("/memory")
 async def delete_session_data(delete_req: DeleteDataRequest):
     """
     Delete data for a particular session
@@ -331,7 +410,7 @@ async def delete_session_data(delete_req: DeleteDataRequest):
         inst.delete_data()
 
 
-@app.get("/v1/sessions")
+@app.get("/sessions")
 async def get_all_sessions() -> AllSessionsResponse:
     """
     Get all sessions
@@ -350,7 +429,7 @@ async def get_all_sessions() -> AllSessionsResponse:
     )
 
 
-@app.get("/v1/users/{user_id}/sessions")
+@app.get("/sessions/{user_id}")
 async def get_sessions_for_user(user_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular user
@@ -369,7 +448,7 @@ async def get_sessions_for_user(user_id: str) -> AllSessionsResponse:
     )
 
 
-@app.get("/v1/groups/{group_id}/sessions")
+@app.get("/sessions/{group_id}")
 async def get_sessions_for_group(group_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular group
@@ -388,7 +467,7 @@ async def get_sessions_for_group(group_id: str) -> AllSessionsResponse:
     )
 
 
-@app.get("/v1/agents/{agent_id}/sessions")
+@app.get("/sessions/{agent_id}")
 async def get_sessions_for_agent(agent_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular agent

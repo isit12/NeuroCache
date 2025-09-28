@@ -429,7 +429,9 @@ class AsyncPgProfileStorage:
         """
         assert self._pool is not None
         async with self._pool.acquire() as conn:
-            await conn.execute(query, user_id, start_time, json.dumps(isolations))
+            await conn.execute(
+                query, user_id, start_time, json.dumps(isolations)
+            )
 
     async def cleanup(self):
         await self._pool.close()
