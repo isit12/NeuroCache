@@ -9,7 +9,7 @@
   },
   "integrations": {
     "ga4": {
-        "measurementId": "G-ED9JCR55CL"
+        "measurementId": "G-166982145"
     }
   },
   "favicon": "favicon.ico",
@@ -62,7 +62,7 @@
             ]
           },
         {
-          "group": "RESTful API",
+          "group": "API reference",
           "openapi": "openapi.json",
           "playground": {
             "display": "interactive"
