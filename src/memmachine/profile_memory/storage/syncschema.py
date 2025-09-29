@@ -24,17 +24,7 @@ async def delete_data(
         "password": password,
         "database": database,
     }
-    print(
-        f"Deleteing tables in {
-            {
-                'host': host,
-                'port': port,
-                'user': user,
-                'password': '****',
-                'database': database,
-            }
-        }"
-    )
+    print(f"Deleteing tables in {d}")
     pool = await asyncpg.create_pool(init=register_vector, **d)
     table_records = await pool.fetch(
         """
@@ -59,17 +49,7 @@ async def sync_to(
         "password": password,
         "database": database,
     }
-    print(
-        f"Syncing schema to {
-            {
-                'host': host,
-                'port': port,
-                'user': user,
-                'password': '****',
-                'database': database,
-            }
-        }"
-    )
+    print(f"syncing to: {d}")
     connection = await asyncpg.connect(**d)
     await connection.execute(get_base())
     print("Re-initializing ...")
