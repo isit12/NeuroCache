@@ -1,6 +1,5 @@
 import os
 import requests
-import logging
 from datetime import datetime
 from fastapi import FastAPI
 from default_query_constructor import DefaultQueryConstructor
@@ -42,8 +41,7 @@ async def store_data(user_id: str, query: str):
         response.raise_for_status()
         return {"status": "success", "data": response.json()}
     except Exception as e:
-        logging.exception("Error occurred in /memory get_data")
-        return {"status": "error", "message": "Internal error in /memory get_data"}
+        return {"status": "error", "message": str(e)}
 
 
 @app.get("/memory")
@@ -62,25 +60,25 @@ async def get_data(query: str, user_id: str, timestamp: str):
             "filter": {"producer_id": user_id},
         }
 
-        logging.debug(f"Sending POST request to {MEMORY_BACKEND_URL}/v1/memories/search")
-        logging.debug(f"Search data: {search_data}")
+        print(f"DEBUG: Sending POST request to {MEMORY_BACKEND_URL}/v1/memories/search")
+        print(f"DEBUG: Search data: {search_data}")
 
         response = requests.post(
             f"{MEMORY_BACKEND_URL}/v1/memories/search", json=search_data, timeout=1000
         )
 
-        logging.debug(f"Response status: {response.status_code}")
-        logging.debug(f"Response headers: {dict(response.headers)}")
+        print(f"DEBUG: Response status: {response.status_code}")
+        print(f"DEBUG: Response headers: {dict(response.headers)}")
 
         if response.status_code != 200:
-            logging.error(f"Backend returned {response.status_code}: {response.text}")
+            print(f"DEBUG: Error response body: {response.text}")
             return {
                 "status": "error",
-                "message": "Failed to retrieve memory data",
+                "message": f"Backend returned {response.status_code}: {response.text}",
             }
 
         response_data = response.json()
-        logging.debug(f"Response data: {response_data}")
+        print(f"DEBUG: Response data: {response_data}")
 
         content = response_data.get("content", {})
         episodic_memory = content.get("episodic_memory", [])
@@ -111,8 +109,12 @@ async def get_data(query: str, user_id: str, timestamp: str):
             "query_type": "example",
         }
     except Exception as e:
-        logging.exception("Error occurred in /memory get_data")
-        return {"status": "error", "message": "Internal error in /memory get_data"}
+        print(f"DEBUG: Exception occurred: {str(e)}")
+        print(f"DEBUG: Exception type: {type(e)}")
+        import traceback
+
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/memory/store-and-search")
@@ -141,12 +143,12 @@ async def store_and_search_data(user_id: str, query: str):
             f"{MEMORY_BACKEND_URL}/v1/memories", json=episode_data, timeout=1000
         )
 
-        logging.debug(f"Store-and-search response status: {resp.status_code}")
+        print(f"DEBUG: Store-and-search response status: {resp.status_code}")
         if resp.status_code != 200:
-            logging.error(f"Store failed with {resp.status_code}: {resp.text}")
+            print(f"DEBUG: Store-and-search error response: {resp.text}")
             return {
                 "status": "error",
-                "message": "Failed to store memory data",
+                "message": f"Store failed with {resp.status_code}: {resp.text}",
             }
 
         search_data = {
@@ -160,12 +162,12 @@ async def store_and_search_data(user_id: str, query: str):
             f"{MEMORY_BACKEND_URL}/v1/memories/search", json=search_data, timeout=1000
         )
 
-        logging.debug(f"Store-and-search response status: {search_resp.status_code}")
+        print(f"DEBUG: Store-and-search response status: {search_resp.status_code}")
         if search_resp.status_code != 200:
-            logging.error(f"Search failed with {search_resp.status_code}: {search_resp.text}")
+            print(f"DEBUG: Store-and-search error response: {search_resp.text}")
             return {
                 "status": "error",
-                "message": "Failed to search memory data",
+                "message": f"Search failed with {search_resp.status_code}: {search_resp.text}",
             }
 
         search_resp.raise_for_status()
@@ -204,8 +206,7 @@ async def store_and_search_data(user_id: str, query: str):
             return f"Message ingested successfully. No relevant context found yet.\n\nFormatted Response:\n{formatted_response}"
 
     except Exception as e:
-        logging.exception("Error occurred in store_and_search_data")
-        return {"status": "error", "message": "Internal error in store_and_search"}
+        return {"status": "error", "message": str(e)}
 
 
 if __name__ == "__main__":
