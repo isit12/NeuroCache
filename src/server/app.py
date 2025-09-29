@@ -14,7 +14,6 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from importlib import import_module
-from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -121,7 +120,7 @@ async def http_app_lifespan(application: FastAPI):
     config_file = os.getenv("MEMORY_CONFIG", "cfg.yml")
     try:
         yaml_config = yaml.safe_load(
-            open(Path(__file__).parent / config_file, encoding="utf-8")
+            open(config_file, encoding="utf-8")
         )
     except Exception as e:
         raise e
@@ -143,7 +142,9 @@ async def http_app_lifespan(application: FastAPI):
     embeddings = OpenAIEmbedder({"api_key": api_key})
 
     global profile_memory
-    prompt_file = yaml_config.get("prompt", {}).get("profile", "profile_prompt")
+    prompt_file = yaml_config.get("prompt", {}).get(
+        "profile", "profile_prompt"
+    )
     db_host = os.getenv("POSTGRES_HOST")
     db_port = os.getenv("POSTGRES_PORT")
     db_user = os.getenv("POSTGRES_USER")
@@ -174,40 +175,16 @@ async def http_app_lifespan(application: FastAPI):
         prompt_module=import_module(f".prompt.{prompt_file}", __package__),
     )
     global episodic_memory
-    episodic_memory = EpisodicMemoryManager.create_episodic_memory_manager(config_file)
+    episodic_memory = EpisodicMemoryManager.create_episodic_memory_manager(
+        config_file
+    )
     await profile_memory.startup()
     yield
     await profile_memory.cleanup()
     await episodic_memory.shut_down()
 
-
 app = FastAPI(lifespan=http_app_lifespan)
 app.add_route("/metrics", make_asgi_app())
-
-
-# === Health Check Endpoint ===
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for container orchestration."""
-    try:
-        # Check if memory managers are initialized
-        if profile_memory is None or episodic_memory is None:
-            raise HTTPException(
-                status_code=503, detail="Memory managers not initialized"
-            )
-
-        # Basic health check - could be extended to check database connectivity
-        return {
-            "status": "healthy",
-            "service": "memmachine",
-            "version": "1.0.0",
-            "memory_managers": {
-                "profile_memory": profile_memory is not None,
-                "episodic_memory": episodic_memory is not None,
-            },
-        }
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
 
 
 # === Route Handlers ===
