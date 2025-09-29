@@ -20,10 +20,10 @@ from .data_types import (
     Derivative,
     Episode,
     EpisodeCluster,
-    IsolationPropertyValue,
-    demangle_isolation_property_key,
-    is_mangled_isolation_property_key,
-    mangle_isolation_property_key,
+    FilterablePropertyValue,
+    demangle_filterable_property_key,
+    is_mangled_filterable_property_key,
+    mangle_filterable_property_key,
 )
 from .derivative_deriver import DerivativeDeriver
 from .derivative_mutator import DerivativeMutator
@@ -223,10 +223,10 @@ class DeclarativeMemory:
             uuid=uuid4(),
             episodes=cluster_episodes,
             timestamp=cluster_episodes[-1].timestamp,
-            isolation_properties=dict(
+            filterable_properties=dict(
                 set.intersection(
                     *(
-                        set(cluster_episode.isolation_properties.items())
+                        set(cluster_episode.filterable_properties.items())
                         for cluster_episode in cluster_episodes
                     )
                 )
@@ -299,8 +299,8 @@ class DeclarativeMemory:
                     "user_metadata": json.dumps(derivative.user_metadata),
                 }
                 | {
-                    mangle_isolation_property_key(key): value
-                    for key, value in derivative.isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in derivative.filterable_properties.items()
                 },
             )
             for derivative, derivative_embedding in zip(
@@ -349,9 +349,9 @@ class DeclarativeMemory:
                     "user_metadata": json.dumps(episode_cluster.user_metadata),
                 }
                 | {
-                    mangle_isolation_property_key(key): value
+                    mangle_filterable_property_key(key): value
                     for key, value in (
-                        episode_cluster.isolation_properties.items()
+                        episode_cluster.filterable_properties.items()
                     )
                 }
             ),
@@ -417,8 +417,8 @@ class DeclarativeMemory:
                 "user_metadata": json.dumps(episode.user_metadata),
             }
             | {
-                mangle_isolation_property_key(key): value
-                for key, value in episode.isolation_properties.items()
+                mangle_filterable_property_key(key): value
+                for key, value in episode.filterable_properties.items()
             },
         )
 
@@ -481,8 +481,8 @@ class DeclarativeMemory:
     async def search(
         self,
         query: str,
-        num_episodes_request: int = 20,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        num_episodes_limit: int = 20,
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ) -> list[Episode]:
         """
         Search declarative memory for episodes relevant to the query.
@@ -490,15 +490,15 @@ class DeclarativeMemory:
         Args:
             query (str):
                 The search query.
-            num_episodes_request (int, optional):
-                The requested minimum number
+            num_episodes_limit (int, optional):
+                The maximum number
                 of episodes to return (default: 20).
-            isolation_properties (
-                dict[str, IsolationPropertyValue], optional
+            filterable_properties (
+                dict[str, FilterablePropertyValue], optional
             ):
-                Isolation property keys and values to use
-                for filtering episodes to the same context.
-                If not provided, no isolation filtering is applied.
+                Filterable property keys and values to use
+                for filtering episodes.
+                If not provided, no filtering is applied.
 
         Returns:
             list[Episode]:
@@ -533,8 +533,8 @@ class DeclarativeMemory:
                 query_embedding=derivative_embedding,
                 required_labels={"Derivative"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
                 include_missing_properties=True,
             )
@@ -558,8 +558,8 @@ class DeclarativeMemory:
                 find_targets=True,
                 required_labels={"EpisodeCluster"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
                 include_missing_properties=True,
             )
@@ -588,8 +588,8 @@ class DeclarativeMemory:
                 find_targets=True,
                 required_labels={"Episode"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
             )
             for matched_episode_cluster_node in matched_episode_cluster_nodes
@@ -613,7 +613,7 @@ class DeclarativeMemory:
         expand_episode_node_contexts_tasks = [
             self._expand_episode_node_context(
                 nuclear_episode_node,
-                isolation_properties=isolation_properties,
+                filterable_properties=filterable_properties,
             )
             for nuclear_episode_node in nuclear_episode_nodes
         ]
@@ -623,18 +623,30 @@ class DeclarativeMemory:
         )
 
         # Rerank contexts.
-        reranked_episode_node_contexts = (
-            await self._rerank_episode_node_contexts(
-                query, episode_node_contexts
-            )
+        episode_node_context_scores = await self._score_episode_node_contexts(
+            query, episode_node_contexts
         )
 
+        reranked_anchored_episode_node_contexts = [
+            (nuclear_episode_node, episode_node_context)
+            for _, nuclear_episode_node, episode_node_context in sorted(
+                zip(
+                    episode_node_context_scores,
+                    nuclear_episode_nodes,
+                    episode_node_contexts,
+                ),
+                key=lambda pair: pair[0],
+                reverse=True,
+            )
+        ]
+
         # Unify contexts.
-        unified_episode_node_context: set[Node] = set()
-        for episode_node_context in reranked_episode_node_contexts:
-            if len(unified_episode_node_context) >= num_episodes_request:
-                break
-            unified_episode_node_context.update(episode_node_context)
+        unified_episode_node_context = (
+            DeclarativeMemory._unify_anchored_episode_node_contexts(
+                reranked_anchored_episode_node_contexts,
+                num_episodes_limit=num_episodes_limit,
+            )
+        )
 
         # Return episodes sorted by timestamp.
         episodes = [
@@ -647,12 +659,12 @@ class DeclarativeMemory:
                     datetime,
                     node.properties.get("timestamp", datetime.min),
                 ),
-                isolation_properties={
-                    demangle_isolation_property_key(key): cast(
-                        IsolationPropertyValue, value
+                filterable_properties={
+                    demangle_filterable_property_key(key): cast(
+                        FilterablePropertyValue, value
                     )
                     for key, value in node.properties.items()
-                    if is_mangled_isolation_property_key(key)
+                    if is_mangled_filterable_property_key(key)
                 },
                 user_metadata=json.loads(
                     cast(str, node.properties["user_metadata"])
@@ -670,7 +682,7 @@ class DeclarativeMemory:
         self,
         nucleus_episode_node: Node,
         retrieval_depth_limit: int = 1,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ) -> set[Node]:
         """
         Expand the context of a nucleus episode node
@@ -689,8 +701,8 @@ class DeclarativeMemory:
                     limit=10,
                     required_labels={"Episode"},
                     required_properties={
-                        mangle_isolation_property_key(key): value
-                        for key, value in isolation_properties.items()
+                        mangle_filterable_property_key(key): value
+                        for key, value in filterable_properties.items()
                     },
                 )
                 for frontier_node in frontier
@@ -711,11 +723,11 @@ class DeclarativeMemory:
 
         return retrieved_context
 
-    async def _rerank_episode_node_contexts(
+    async def _score_episode_node_contexts(
         self, query: str, episode_node_contexts: list[set[Node]]
-    ) -> list[set[Node]]:
+    ) -> list[float]:
         """
-        Rerank episode node contexts
+        Score episode node contexts
         based on their relevance to the query.
         """
         episode_node_context_contents = [
@@ -736,22 +748,61 @@ class DeclarativeMemory:
             for episode_node_context in episode_node_contexts
         ]
 
-        episode_node_context_content_scores = await self._reranker.score(
+        episode_node_context_scores = await self._reranker.score(
             query, episode_node_context_contents
         )
 
-        reranked_episode_node_contexts = [
-            episode_node_context
-            for _, episode_node_context in sorted(
-                zip(
-                    episode_node_context_content_scores,
-                    episode_node_contexts,
-                ),
-                key=lambda pair: pair[0],
-                reverse=True,
-            )
-        ]
-        return reranked_episode_node_contexts
+        return episode_node_context_scores
+
+    @staticmethod
+    def _unify_anchored_episode_node_contexts(
+        anchored_episode_node_contexts: list[tuple[Node, set[Node]]],
+        num_episodes_limit: int,
+    ) -> set[Node]:
+        """
+        Unify episode node contexts
+        anchored on their nuclear episode nodes
+        into a single set of episode nodes,
+        respecting the episode limit.
+        """
+        unified_episode_node_context: set[Node] = set()
+
+        for nucleus, context in anchored_episode_node_contexts:
+            if (
+                len(unified_episode_node_context) + len(context)
+            ) <= num_episodes_limit:
+                # It is impossible that the context exceeds the limit.
+                unified_episode_node_context.update(context)
+            else:
+                # It is possible that the context exceeds the limit.
+                # Prioritize episodes near the nucleus.
+
+                # Sort context episodes by timestamp.
+                chronological_context = sorted(
+                    context,
+                    key=lambda node: cast(
+                        datetime,
+                        node.properties.get("timestamp", datetime.min),
+                    ),
+                )
+
+                # Sort chronological episodes by index-proximity to nucleus.
+                nucleus_index = chronological_context.index(nucleus)
+                nuclear_context = sorted(
+                    chronological_context,
+                    key=lambda node: abs(
+                        chronological_context.index(node) - nucleus_index
+                    ),
+                )
+
+                # Add episodes to unified context until limit is reached,
+                # or until the context is exhausted.
+                for episode_node in nuclear_context:
+                    if len(unified_episode_node_context) >= num_episodes_limit:
+                        return unified_episode_node_context
+                    unified_episode_node_context.add(episode_node)
+
+        return unified_episode_node_context
 
     async def forget_all(self):
         """
@@ -761,18 +812,18 @@ class DeclarativeMemory:
 
     async def forget_isolated_episodes(
         self,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ):
         """
-        Forget all episodes matching the given isolation properties
+        Forget all episodes matching the given filterable properties
         and data derived from them.
         """
         matching_episode_nodes = (
             await self._vector_graph_store.search_matching_nodes(
                 required_labels={"Episode"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
             )
         )

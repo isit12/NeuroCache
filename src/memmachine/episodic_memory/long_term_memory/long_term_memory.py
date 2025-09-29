@@ -152,7 +152,7 @@ class LongTermMemory:
                 "name": "previous",
                 "config": {
                     "vector_graph_store_id": vector_graph_store_id,
-                    "isolation_property_keys": [
+                    "filterable_property_keys": [
                         "group_id",
                         "session_id",
                     ],
@@ -220,7 +220,7 @@ class LongTermMemory:
             ],
             content=episode.content,
             timestamp=episode.timestamp,
-            isolation_properties={
+            filterable_properties={
                 key: value
                 for key, value in {
                     "group_id": episode.group_id,
@@ -242,8 +242,8 @@ class LongTermMemory:
     ):
         declarative_memory_episodes = await self._declarative_memory.search(
             query,
-            num_episodes_request=num_episodes_limit,
-            isolation_properties=id_filter,
+            num_episodes_limit=num_episodes_limit,
+            filterable_properties=id_filter,
         )
         return [
             Episode(
@@ -256,33 +256,33 @@ class LongTermMemory:
                 ),
                 content=declarative_memory_episode.content,
                 timestamp=declarative_memory_episode.timestamp,
-                group_id=declarative_memory_episode.isolation_properties.get(
+                group_id=declarative_memory_episode.filterable_properties.get(
                     "group_id", ""
                 ),
-                session_id=declarative_memory_episode.isolation_properties.get(
+                session_id=declarative_memory_episode.filterable_properties.get(
                     "session_id", ""
                 ),
                 producer_id=(
-                    declarative_memory_episode.isolation_properties.get(
+                    declarative_memory_episode.filterable_properties.get(
                         "producer_id", ""
                     )
                 ),
                 produced_for_id=(
-                    declarative_memory_episode.isolation_properties.get(
+                    declarative_memory_episode.filterable_properties.get(
                         "produced_for_id", ""
                     )
                 ),
                 user_metadata=declarative_memory_episode.user_metadata,
             )
             for declarative_memory_episode in declarative_memory_episodes
-        ][-num_episodes_limit:]
+        ]
 
     async def clear(self):
         self._declarative_memory.forget_all()
 
     async def forget_session(self):
         await self._declarative_memory.forget_isolated_episodes(
-            isolation_properties={
+            filterable_properties={
                 "group_id": self._memory_context.group_id,
                 "session_id": self._memory_context.session_id,
             }
