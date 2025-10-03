@@ -8,6 +8,7 @@ import functools
 import json
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from string import Template
 from typing import Any, Self, cast
 from uuid import uuid4
 
@@ -20,10 +21,10 @@ from .data_types import (
     Derivative,
     Episode,
     EpisodeCluster,
-    IsolationPropertyValue,
-    demangle_isolation_property_key,
-    is_mangled_isolation_property_key,
-    mangle_isolation_property_key,
+    FilterablePropertyValue,
+    demangle_filterable_property_key,
+    is_mangled_filterable_property_key,
+    mangle_filterable_property_key,
 )
 from .derivative_deriver import DerivativeDeriver
 from .derivative_mutator import DerivativeMutator
@@ -74,6 +75,9 @@ class DeclarativeMemory:
                             - derivative_mutator:
                               DerivativeMutator instance
                               used for mutating derivatives.
+                - episode_metadata_template:
+                    Template string supporting $-substitutions
+                    (default: "[$timestamp] $content").
         """
 
         self._vector_graph_store: VectorGraphStore = config[
@@ -149,6 +153,10 @@ class DeclarativeMemory:
             ].items()
         }
 
+        self._episode_metadata_template = Template(
+            config.get("episode_metadata_template", "[$timestamp] $content")
+        )
+
     class Workflow:
         def __init__(
             self,
@@ -223,10 +231,10 @@ class DeclarativeMemory:
             uuid=uuid4(),
             episodes=cluster_episodes,
             timestamp=cluster_episodes[-1].timestamp,
-            isolation_properties=dict(
+            filterable_properties=dict(
                 set.intersection(
                     *(
-                        set(cluster_episode.isolation_properties.items())
+                        set(cluster_episode.filterable_properties.items())
                         for cluster_episode in cluster_episodes
                     )
                 )
@@ -299,8 +307,8 @@ class DeclarativeMemory:
                     "user_metadata": json.dumps(derivative.user_metadata),
                 }
                 | {
-                    mangle_isolation_property_key(key): value
-                    for key, value in derivative.isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in derivative.filterable_properties.items()
                 },
             )
             for derivative, derivative_embedding in zip(
@@ -349,9 +357,9 @@ class DeclarativeMemory:
                     "user_metadata": json.dumps(episode_cluster.user_metadata),
                 }
                 | {
-                    mangle_isolation_property_key(key): value
+                    mangle_filterable_property_key(key): value
                     for key, value in (
-                        episode_cluster.isolation_properties.items()
+                        episode_cluster.filterable_properties.items()
                     )
                 }
             ),
@@ -417,8 +425,8 @@ class DeclarativeMemory:
                 "user_metadata": json.dumps(episode.user_metadata),
             }
             | {
-                mangle_isolation_property_key(key): value
-                for key, value in episode.isolation_properties.items()
+                mangle_filterable_property_key(key): value
+                for key, value in episode.filterable_properties.items()
             },
         )
 
@@ -482,7 +490,7 @@ class DeclarativeMemory:
         self,
         query: str,
         num_episodes_limit: int = 20,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ) -> list[Episode]:
         """
         Search declarative memory for episodes relevant to the query.
@@ -493,12 +501,12 @@ class DeclarativeMemory:
             num_episodes_limit (int, optional):
                 The maximum number
                 of episodes to return (default: 20).
-            isolation_properties (
-                dict[str, IsolationPropertyValue], optional
+            filterable_properties (
+                dict[str, FilterablePropertyValue], optional
             ):
-                Isolation property keys and values to use
-                for filtering episodes to the same context.
-                If not provided, no isolation filtering is applied.
+                Filterable property keys and values to use
+                for filtering episodes.
+                If not provided, no filtering is applied.
 
         Returns:
             list[Episode]:
@@ -533,8 +541,8 @@ class DeclarativeMemory:
                 query_embedding=derivative_embedding,
                 required_labels={"Derivative"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
                 include_missing_properties=True,
             )
@@ -558,8 +566,8 @@ class DeclarativeMemory:
                 find_targets=True,
                 required_labels={"EpisodeCluster"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
                 include_missing_properties=True,
             )
@@ -588,8 +596,8 @@ class DeclarativeMemory:
                 find_targets=True,
                 required_labels={"Episode"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
             )
             for matched_episode_cluster_node in matched_episode_cluster_nodes
@@ -613,7 +621,7 @@ class DeclarativeMemory:
         expand_episode_node_contexts_tasks = [
             self._expand_episode_node_context(
                 nuclear_episode_node,
-                isolation_properties=isolation_properties,
+                filterable_properties=filterable_properties,
             )
             for nuclear_episode_node in nuclear_episode_nodes
         ]
@@ -649,29 +657,9 @@ class DeclarativeMemory:
         )
 
         # Return episodes sorted by timestamp.
-        episodes = [
-            Episode(
-                uuid=node.uuid,
-                episode_type=cast(str, node.properties["episode_type"]),
-                content_type=ContentType(node.properties["content_type"]),
-                content=node.properties["content"],
-                timestamp=cast(
-                    datetime,
-                    node.properties.get("timestamp", datetime.min),
-                ),
-                isolation_properties={
-                    demangle_isolation_property_key(key): cast(
-                        IsolationPropertyValue, value
-                    )
-                    for key, value in node.properties.items()
-                    if is_mangled_isolation_property_key(key)
-                },
-                user_metadata=json.loads(
-                    cast(str, node.properties["user_metadata"])
-                ),
-            )
-            for node in unified_episode_node_context
-        ]
+        episodes = DeclarativeMemory._episodes_from_episode_nodes(
+            list(unified_episode_node_context)
+        )
 
         return sorted(
             episodes,
@@ -682,7 +670,7 @@ class DeclarativeMemory:
         self,
         nucleus_episode_node: Node,
         retrieval_depth_limit: int = 1,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ) -> set[Node]:
         """
         Expand the context of a nucleus episode node
@@ -701,8 +689,8 @@ class DeclarativeMemory:
                     limit=10,
                     required_labels={"Episode"},
                     required_properties={
-                        mangle_isolation_property_key(key): value
-                        for key, value in isolation_properties.items()
+                        mangle_filterable_property_key(key): value
+                        for key, value in filterable_properties.items()
                     },
                 )
                 for frontier_node in frontier
@@ -730,26 +718,53 @@ class DeclarativeMemory:
         Score episode node contexts
         based on their relevance to the query.
         """
-        episode_node_context_contents = [
-            "\n".join(
-                [
-                    cast(str, episode_node.properties["content"])
-                    for episode_node in sorted(
-                        episode_node_context,
-                        key=lambda node: cast(
-                            datetime,
-                            node.properties.get("timestamp", datetime.min),
-                        ),
-                    )
-                    if ContentType(episode_node.properties["content_type"])
-                    == ContentType.STRING
-                ]
+        contexts_episodes = [
+            DeclarativeMemory._episodes_from_episode_nodes(
+                list(episode_node_context)
             )
             for episode_node_context in episode_node_contexts
         ]
 
+        def get_formatted_episode_content(episode: Episode) -> str:
+            # Format episode content for reranker using metadata.
+            return self._episode_metadata_template.safe_substitute(
+                {
+                    "episode_type": episode.episode_type,
+                    "content_type": episode.content_type.value,
+                    "content": episode.content,
+                    "timestamp": episode.timestamp,
+                    "filterable_properties": (episode.filterable_properties),
+                    "user_metadata": episode.user_metadata,
+                },
+                **{
+                    key: value
+                    for key, value in {
+                        **episode.filterable_properties,
+                        **(
+                            episode.user_metadata
+                            if isinstance(episode.user_metadata, dict)
+                            else {}
+                        ),
+                    }.items()
+                },
+            )
+
+        contexts_content = [
+            "\n".join(
+                [
+                    get_formatted_episode_content(context_episode)
+                    for context_episode in sorted(
+                        context_episodes,
+                        key=lambda episode: episode.timestamp,
+                    )
+                    if context_episode.content_type == ContentType.STRING
+                ]
+            )
+            for context_episodes in contexts_episodes
+        ]
+
         episode_node_context_scores = await self._reranker.score(
-            query, episode_node_context_contents
+            query, contexts_content
         )
 
         return episode_node_context_scores
@@ -812,18 +827,18 @@ class DeclarativeMemory:
 
     async def forget_isolated_episodes(
         self,
-        isolation_properties: dict[str, IsolationPropertyValue] = {},
+        filterable_properties: dict[str, FilterablePropertyValue] = {},
     ):
         """
-        Forget all episodes matching the given isolation properties
+        Forget all episodes matching the given filterable properties
         and data derived from them.
         """
         matching_episode_nodes = (
             await self._vector_graph_store.search_matching_nodes(
                 required_labels={"Episode"},
                 required_properties={
-                    mangle_isolation_property_key(key): value
-                    for key, value in isolation_properties.items()
+                    mangle_filterable_property_key(key): value
+                    for key, value in filterable_properties.items()
                 },
             )
         )
@@ -893,3 +908,42 @@ class DeclarativeMemory:
 
     async def close(self):
         await self._vector_graph_store.close()
+
+    @staticmethod
+    def _episodes_from_episode_nodes(
+        episode_nodes: list[Node],
+    ) -> list[Episode]:
+        """
+        Convert a list of episode Nodes to a list of Episodes.
+
+        Args:
+            episode_nodes (list[Node]):
+                A list of Nodes representing episodes.
+
+        Returns:
+            list[Episode]:
+                A list of Episodes constructed from the episode Nodes.
+        """
+        return [
+            Episode(
+                uuid=node.uuid,
+                episode_type=cast(str, node.properties["episode_type"]),
+                content_type=ContentType(node.properties["content_type"]),
+                content=node.properties["content"],
+                timestamp=cast(
+                    datetime,
+                    node.properties.get("timestamp", datetime.min),
+                ),
+                filterable_properties={
+                    demangle_filterable_property_key(key): cast(
+                        FilterablePropertyValue, value
+                    )
+                    for key, value in node.properties.items()
+                    if is_mangled_filterable_property_key(key)
+                },
+                user_metadata=json.loads(
+                    cast(str, node.properties["user_metadata"])
+                ),
+            )
+            for node in episode_nodes
+        ]
