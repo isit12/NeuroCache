@@ -206,7 +206,7 @@ async def http_app_lifespan(application: FastAPI):
     await episodic_memory.shut_down()
 
 mcp = FastMCP("MemMachine")
-mcp_app = mcp.http_app("/mcp")
+mcp_app = mcp.http_app("/")
 
 
 @asynccontextmanager
@@ -367,6 +367,7 @@ async def mcp_get_agent_sessions(agent_id: str) -> AllSessionsResponse:
         An AllSessionsResponse containing a list of sessions for the agent.
     """
     return await get_sessions_for_agent(agent_id)
+
 
 # === Route Handlers ===
 @app.post("/v1/memories")
