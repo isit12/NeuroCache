@@ -99,12 +99,7 @@ async def process_question(
         ),
     )
 
-    (
-        short_term_episodes,
-        long_term_episodes,
-        summaries,
-    ) = await memory.query_memory(query=question, limit=30)
-    episodes = long_term_episodes + short_term_episodes
+    episodes, summaries = await memory.query_memory(query=question, limit=20)
     summary = summaries[0] if summaries else ""
     memory_end = time.time()
 
