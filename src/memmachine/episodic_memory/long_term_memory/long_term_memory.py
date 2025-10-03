@@ -94,8 +94,7 @@ class LongTermMemory:
         if not isinstance(metadata_prefix, str):
             raise TypeError("Metadata prefix must be a string")
 
-        derivative_metadata_template = f"{metadata_prefix}$content"
-        episode_metadata_template = f"{metadata_prefix}$content"
+        metadata_derivative_template = f"{metadata_prefix}$content"
 
         # Configure rerankers
         reranker_configs = config.get("reranker") or {}
@@ -146,7 +145,6 @@ class LongTermMemory:
                     "derivation_workflows": {
                         "default": [derivation_workflow_definition],
                     },
-                    "episode_metadata_template": episode_metadata_template,
                 },
             },
             "_previous_related_episode_postulator": {
@@ -169,7 +167,7 @@ class LongTermMemory:
                 "type": "derivative_mutator",
                 "name": "metadata",
                 "config": {
-                    "template": derivative_metadata_template,
+                    "template": metadata_derivative_template,
                 },
             },
             "_episode_derivative_deriver": {
