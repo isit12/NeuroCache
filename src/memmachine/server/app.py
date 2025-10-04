@@ -368,6 +368,7 @@ async def mcp_get_agent_sessions(agent_id: str) -> AllSessionsResponse:
     """
     return await get_sessions_for_agent(agent_id)
 
+
 # === Route Handlers ===
 @app.post("/v1/memories")
 async def add_memory(episode: NewEpisode):
