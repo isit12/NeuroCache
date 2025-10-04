@@ -29,10 +29,13 @@ def main():
         f"\nBase Url: {args.base_url}"
     )
 
-    from memmachine_locomo import MemMachineSearch
+    from memmachine_locomo import MemMachineAdd, MemMachineSearch
 
     dataset = args.dataset
-    if args.method == "search":
+    if args.method == "add":
+        im = MemMachineAdd(dataset)
+        asyncio.run(im.process_all_conversations(base_url=args.base_url))
+    elif args.method == "search":
         im = MemMachineSearch()
         asyncio.run(im.process_data_file(dataset, base_url=args.base_url))
     else:
