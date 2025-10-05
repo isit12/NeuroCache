@@ -20,7 +20,6 @@ storage:
     user: neo4j
     password: <NEO4J_PASSWORD>
 
-# Session memory not used for LoCoMo. Note: This will use some chat completion tokens.
 sessionmemory:
   model_name: my_model_id
   message_capacity: 500
