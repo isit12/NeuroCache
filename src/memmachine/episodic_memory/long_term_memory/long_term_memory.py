@@ -94,8 +94,7 @@ class LongTermMemory:
         if not isinstance(metadata_prefix, str):
             raise TypeError("Metadata prefix must be a string")
 
-        derivative_metadata_template = f"{metadata_prefix}$content"
-        episode_metadata_template = f"{metadata_prefix}$content"
+        metadata_derivative_template = f"{metadata_prefix}$content"
 
         # Configure rerankers
         reranker_configs = config.get("reranker") or {}
@@ -146,7 +145,6 @@ class LongTermMemory:
                     "derivation_workflows": {
                         "default": [derivation_workflow_definition],
                     },
-                    "episode_metadata_template": episode_metadata_template,
                 },
             },
             "_previous_related_episode_postulator": {
@@ -154,7 +152,7 @@ class LongTermMemory:
                 "name": "previous",
                 "config": {
                     "vector_graph_store_id": vector_graph_store_id,
-                    "filterable_property_keys": [
+                    "isolation_property_keys": [
                         "group_id",
                         "session_id",
                     ],
@@ -169,7 +167,7 @@ class LongTermMemory:
                 "type": "derivative_mutator",
                 "name": "metadata",
                 "config": {
-                    "template": derivative_metadata_template,
+                    "template": metadata_derivative_template,
                 },
             },
             "_episode_derivative_deriver": {
@@ -222,7 +220,7 @@ class LongTermMemory:
             ],
             content=episode.content,
             timestamp=episode.timestamp,
-            filterable_properties={
+            isolation_properties={
                 key: value
                 for key, value in {
                     "group_id": episode.group_id,
@@ -245,7 +243,7 @@ class LongTermMemory:
         declarative_memory_episodes = await self._declarative_memory.search(
             query,
             num_episodes_limit=num_episodes_limit,
-            filterable_properties=id_filter,
+            isolation_properties=id_filter,
         )
         return [
             Episode(
@@ -258,19 +256,19 @@ class LongTermMemory:
                 ),
                 content=declarative_memory_episode.content,
                 timestamp=declarative_memory_episode.timestamp,
-                group_id=declarative_memory_episode.filterable_properties.get(
+                group_id=declarative_memory_episode.isolation_properties.get(
                     "group_id", ""
                 ),
-                session_id=declarative_memory_episode.filterable_properties.get(
+                session_id=declarative_memory_episode.isolation_properties.get(
                     "session_id", ""
                 ),
                 producer_id=(
-                    declarative_memory_episode.filterable_properties.get(
+                    declarative_memory_episode.isolation_properties.get(
                         "producer_id", ""
                     )
                 ),
                 produced_for_id=(
-                    declarative_memory_episode.filterable_properties.get(
+                    declarative_memory_episode.isolation_properties.get(
                         "produced_for_id", ""
                     )
                 ),
@@ -284,7 +282,7 @@ class LongTermMemory:
 
     async def forget_session(self):
         await self._declarative_memory.forget_isolated_episodes(
-            filterable_properties={
+            isolation_properties={
                 "group_id": self._memory_context.group_id,
                 "session_id": self._memory_context.session_id,
             }
