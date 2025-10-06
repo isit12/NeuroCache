@@ -44,7 +44,7 @@ class SentenceDerivativeDeriver(DerivativeDeriver):
                 content_type=ContentType.STRING,
                 content=sentence,
                 timestamp=episode.timestamp,
-                filterable_properties=episode.filterable_properties,
+                isolation_properties=episode.isolation_properties,
                 user_metadata=episode.user_metadata,
             )
             for episode in episode_cluster.episodes

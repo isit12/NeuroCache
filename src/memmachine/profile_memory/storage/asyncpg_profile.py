@@ -304,46 +304,34 @@ class AsyncPgProfileStorage:
         k: int,
         min_cos: float,
         isolations: dict[str, bool | int | float | str] = {},
-        include_citations: bool = False,
     ) -> list[dict[str, Any]]:
         assert self._pool is not None
         async with self._pool.acquire() as conn:
             agg = await conn.fetch(
-                """
-                SELECT JSON_BUILD_OBJECT(
-                    'tag', p.tag,
-                    'feature', p.feature,
-                    'value', p.value,
-                    'metadata', JSON_BUILD_OBJECT(
-                        'id', p.id,
-                        'similarity_score', (-(p.embedding <#> $1::vector))
-                """
-                + (
-                    f"""
-                        , 'citations', COALESCE(
-                            (
-                                SELECT JSON_AGG(h.content)
-                                FROM {AsyncPgProfileStorage.junction_table} j
-                                JOIN {AsyncPgProfileStorage.history_table} h ON j.content_id = h.id
-                                WHERE p.id = j.profile_id
-                            ),
-                            '[]'::json
-                        )
-                    """
-                    if include_citations
-                    else ""
+                f"""
+            SELECT JSON_BUILD_OBJECT(
+                'tag', p.tag,
+                'feature', p.feature,
+                'value', p.value,
+                'metadata', JSON_BUILD_OBJECT(
+                    'id', p.id,
+                    'similarity_score', (-(p.embedding <#> $1::vector)),
+                    'citations', COALESCE((
+                        SELECT JSON_AGG(h.content)
+                        FROM {AsyncPgProfileStorage.junction_table} j
+                        JOIN {AsyncPgProfileStorage.history_table} h ON j.content_id = h.id
+                        WHERE p.id = j.profile_id
+                    ), '[]'::json)
                 )
-                + f"""
-                    )
-                )
-                FROM {AsyncPgProfileStorage.main_table} p
-                WHERE p.user_id = $2
-                AND -(p.embedding <#> $1::vector) > $3
-                AND p.isolations @> $4
-                GROUP BY p.tag, p.feature, p.value, p.id, p.embedding
-                ORDER BY -(p.embedding <#> $1::vector) DESC
-                LIMIT $5
-                """,
+            )
+            FROM {AsyncPgProfileStorage.main_table} p
+            WHERE p.user_id = $2
+            AND -(p.embedding <#> $1::vector) > $3
+            AND p.isolations @> $4
+            GROUP BY p.tag, p.feature, p.value, p.id, p.embedding
+            ORDER BY -(p.embedding <#> $1::vector) DESC
+            LIMIT $5
+            """,
                 qemb,
                 user_id,
                 min_cos,
@@ -441,9 +429,7 @@ class AsyncPgProfileStorage:
         """
         assert self._pool is not None
         async with self._pool.acquire() as conn:
-            await conn.execute(
-                query, user_id, start_time, json.dumps(isolations)
-            )
+            await conn.execute(query, user_id, start_time, json.dumps(isolations))
 
     async def cleanup(self):
         await self._pool.close()
