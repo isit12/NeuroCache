@@ -25,37 +25,22 @@ class BM25Reranker(Reranker):
         Args:
             config (dict[str, Any], optional):
                 Configuration dictionary containing:
-                - languages (str | list[str], optional):
-                  Language(s) for stop words (default: "english").
-                  Languages must be supported by NLTK stopwords corpus.
+                - language (str, optional):
+                  Language for stop words (default: "english").
         """
         super().__init__()
 
-        languages = config.get("languages", "english")
-        try:
-            self._stop_words = stopwords.words(languages)
-        except Exception as e:
-            raise ValueError(
-                f"Unsupported language(s) provided: {languages}"
-            ) from e
+        language = config.get("language", "english")
+        self._stop_words = stopwords.words(language)
 
     async def score(self, query: str, candidates: list[str]) -> list[float]:
-        candidates_tokens = [
-            self._preprocess_text(candidate) for candidate in candidates
-        ]
-
-        if not any(candidates_tokens):
-            # There are no tokens in the corpus.
-            return [0.0 for _ in candidates]
-
-        # There is at least one token in the corpus.
-        bm25 = BM25Okapi(candidates_tokens)
-
+        bm25 = BM25Okapi(
+            [self._preprocess_text(candidate) for candidate in candidates]
+        )
         scores = [
             float(score)
             for score in bm25.get_scores(self._preprocess_text(query))
         ]
-
         return scores
 
     def _preprocess_text(self, text: str) -> list[str]:
@@ -75,7 +60,5 @@ class BM25Reranker(Reranker):
         alphanumeric_text = re.sub(r"\W+", " ", text)
         lower_text = alphanumeric_text.lower()
         words = word_tokenize(lower_text)
-        tokens = [
-            word for word in words if word and word not in self._stop_words
-        ]
+        tokens = [word for word in words if word not in self._stop_words]
         return tokens
