@@ -43,9 +43,6 @@ class EmbedderReranker(Reranker):
         self._embedder = embedder
 
     async def score(self, query: str, candidates: list[str]) -> list[float]:
-        if len(candidates) == 0:
-            return []
-
         query_embedding = np.array(
             await self._embedder.search_embed([query])
         ).flatten()
@@ -53,12 +50,8 @@ class EmbedderReranker(Reranker):
             await self._embedder.ingest_embed(candidates)
         )
 
-        magnitude_products = np.linalg.norm(
-            candidate_embeddings, axis=-1
-        ) * np.linalg.norm(query_embedding)
-
-        magnitude_products[magnitude_products == 0] = float("inf")
-        scores = (
-            np.dot(candidate_embeddings, query_embedding) / magnitude_products
+        scores = np.dot(candidate_embeddings, query_embedding) / (
+            np.linalg.norm(candidate_embeddings, axis=-1)
+            * np.linalg.norm(query_embedding)
         )
         return scores.astype(float).tolist()
