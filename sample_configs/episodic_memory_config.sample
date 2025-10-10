@@ -1,27 +1,33 @@
+logging:
+  path: /tmp/memory_log
+  level: info #| debug | error
+
 long_term_memory:
   derivative_deriver: sentence
-  metadata_prefix: "[$source_timestamp] $producer_id: "
+  metadata_prefix: "[$timestamp] $producer_id: "
   embedder: my_embedder_id
   reranker: my_reranker_id
   vector_graph_store: my_storage_id
 
-sessiondb:
+SessionDB:
   uri: sqlitetest.db
 
-model:
-  my_model_id:
+Model:
+  testmodel:
+    model_vendor: openai
     model_name: "gpt-4o-mini"
-    api_key: <OPENAI_API_KEY>
+    api_key: <YOUR_API_KEY>
+    
 storage:
   my_storage_id:
     vendor_name: neo4j
     host: localhost
     port: 7687
     user: neo4j
-    password: <NEO4J_PASSWORD>
+    password: <YOUR_PASSWORD_HERE>
 
-sessionmemory:
-  model_name: my_model_id
+sessionMemory:
+  model_name: testmodel
   message_capacity: 500
   max_message_length: 16000
   max_token_num: 8000
@@ -29,7 +35,7 @@ sessionmemory:
 embedder:
   my_embedder_id:
     model_name: "text-embedding-3-small"
-    api_key: <OPENAI_API_KEY>
+    api_key: <YOUR_API_KEY>
 
 reranker:
   my_reranker_id:
@@ -45,3 +51,17 @@ reranker:
   ce_ranker_id:
     type: "cross-encoder"
     model_name: "cross-encoder/qnli-electra-base"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
