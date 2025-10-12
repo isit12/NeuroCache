@@ -4,10 +4,8 @@
 FROM python:3.12-slim-trixie AS builder
 
 # Update OS and Python/PIP Packages
-# Install curl
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -50,10 +48,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.12-slim-trixie AS final
 
 # Update OS and Python/PIP Packages
-# Install curl
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

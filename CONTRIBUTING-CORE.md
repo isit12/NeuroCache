@@ -39,21 +39,10 @@ Follow these steps to set up your local development environment:
 
 3. **Install Dependencies:**
 
-    In the project root directory, where the `pyproject.toml` file resides, run
-    one of the following commands to install the project in editable mode with
-    all dependencies for testing:
-
-    Using `uv`:
+    In the project root directory, where the `pyproject.toml` file resides, run:
 
     ```bash
-    uv pip install -e ".[test]" # Installs the PyTest dependencies
-    uv pip install -e ".[gpu,test]" # Installs the GPU and PyTest dependencies
-    ```
-
-    Using `Poetry`:
-
-    ```bash
-    poetry install --all-extras
+    pip install .
     ```
 
 ## 3. Code Style and Quality
@@ -63,7 +52,7 @@ The project enforces a strict code style using **Black** for formatting and
 
 ## 4. Testing
 
-All contributions should include unit tests to ensure functionality.
+All contributions should include tests to ensure functionality.
 
 - To run the entire test suite, use: `pytest`
 - To run tests for a specific file, use: `pytest path/to/your_test_file.py`
