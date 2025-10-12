@@ -14,15 +14,15 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
 
+from dataclasses import dataclass
 import uvicorn
 import yaml
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastmcp import Context, FastMCP
+from fastmcp import FastMCP, Context
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
@@ -39,6 +39,7 @@ from memmachine.episodic_memory.episodic_memory_manager import (
     EpisodicMemoryManager,
 )
 from memmachine.profile_memory.profile_memory import ProfileMemory
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,6 @@ class SearchQuery(BaseModel):
 # === Response Models ===
 class SearchResult(BaseModel):
     """Response model for memory search results."""
-
     status: int = 0
     content: dict[str, Any]
 
@@ -111,11 +111,9 @@ episodic_memory: EpisodicMemoryManager = None
 
 # === Lifespan Management ===
 
-
 @dataclass
 class DBConfig:
     """Database configuration model."""
-
     host: str | None
     port: str | None
     user: str | None
@@ -158,7 +156,9 @@ async def http_app_lifespan(application: FastAPI):
     """
     config_file = os.getenv("MEMORY_CONFIG", "cfg.yml")
     try:
-        yaml_config = yaml.safe_load(open(config_file, encoding="utf-8"))
+        yaml_config = yaml.safe_load(
+            open(config_file, encoding="utf-8")
+        )
     except Exception as e:
         raise e
 
@@ -205,7 +205,6 @@ async def http_app_lifespan(application: FastAPI):
     await profile_memory.cleanup()
     await episodic_memory.shut_down()
 
-
 mcp = FastMCP("MemMachine")
 mcp_app = mcp.http_app("/")
 
@@ -226,10 +225,9 @@ async def mcp_http_lifespan(application: FastAPI):
         async with mcp_app.lifespan(application):
             yield
 
-
 app = FastAPI(lifespan=mcp_http_lifespan)
 app.mount("/mcp", mcp_app)
-app.mount("/metrics", make_asgi_app())
+app.add_route("/metrics", make_asgi_app())
 
 
 @mcp.tool()
@@ -539,7 +537,7 @@ async def get_sessions_for_user(user_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular user
     """
-    sessions = episodic_memory.get_user_sessions(user_id)
+    sessions = episodic_memory.get_sessions_for_user(user_id)
     return AllSessionsResponse(
         sessions=[
             MemorySession(
@@ -558,7 +556,7 @@ async def get_sessions_for_group(group_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular group
     """
-    sessions = episodic_memory.get_group_sessions(group_id)
+    sessions = episodic_memory.get_sessions_for_group(group_id)
     return AllSessionsResponse(
         sessions=[
             MemorySession(
@@ -577,7 +575,7 @@ async def get_sessions_for_agent(agent_id: str) -> AllSessionsResponse:
     """
     Get all sessions for a particular agent
     """
-    sessions = episodic_memory.get_agent_sessions(agent_id)
+    sessions = episodic_memory.get_sessions_for_agent(agent_id)
     return AllSessionsResponse(
         sessions=[
             MemorySession(
@@ -589,33 +587,6 @@ async def get_sessions_for_agent(agent_id: str) -> AllSessionsResponse:
             for s in sessions
         ]
     )
-
-
-# === Health Check Endpoint ===
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for container orchestration."""
-    try:
-        # Check if memory managers are initialized
-        if profile_memory is None or episodic_memory is None:
-            raise HTTPException(
-                status_code=503, detail="Memory managers not initialized"
-            )
-
-        # Basic health check - could be extended to check database connectivity
-        return {
-            "status": "healthy",
-            "service": "memmachine",
-            "version": "1.0.0",
-            "memory_managers": {
-                "profile_memory": profile_memory is not None,
-                "episodic_memory": episodic_memory is not None,
-            },
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=503, detail=f"Service unhealthy: {str(e)}"
-        )
 
 
 async def start():
