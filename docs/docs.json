@@ -86,11 +86,7 @@
           {
             "group": "Examples",
             "pages": [
-              "examples/introduction",
-              "examples/agents",
-              "examples/python",
-              "examples/rest",
-              "examples/mcp"
+              "examples/introduction"
             ]
           }
         ]
