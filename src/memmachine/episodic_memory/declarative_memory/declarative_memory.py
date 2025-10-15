@@ -6,7 +6,6 @@ episodic and semantic memory.
 import asyncio
 import functools
 import json
-import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from string import Template
@@ -30,8 +29,6 @@ from .data_types import (
 from .derivative_deriver import DerivativeDeriver
 from .derivative_mutator import DerivativeMutator
 from .related_episode_postulator import RelatedEpisodePostulator
-
-logger = logging.getLogger(__name__)
 
 
 class DeclarativeMemory:
@@ -294,17 +291,10 @@ class DeclarativeMemory:
         Process the result of derivative mutation
         by embedding and creating nodes for the mutated derivatives.
         """
-        try:
-            mutated_derivative_embeddings = await self._embedder.ingest_embed(
-                [derivative.content for derivative in mutated_derivatives],
-                max_attempts=3
-            )
-        except (ValueError, IOError) as e:
-            logger.error(
-                "Failed to create embeddings for mutated derivatives %s",
-                str(e)
-            )
-            return []
+
+        mutated_derivative_embeddings = await self._embedder.ingest_embed(
+            [derivative.content for derivative in mutated_derivatives]
+        )
 
         mutated_derivative_nodes = [
             Node(
