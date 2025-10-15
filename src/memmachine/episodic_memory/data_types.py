@@ -30,25 +30,24 @@ class SessionInfo:
     This is typically retrieved from or stored in a session management
     database.
     """
-    group_id: str
-    """The identifier for a group conversation."""
-    session_id: str
-    """
-    A unique string identifier for the session.
-    """
-    agent_ids: list[str]
-    """A list of agent identifiers participating in the session."""
+
     user_ids: list[str]
     """A list of user identifiers participating in the session."""
-    configuration: dict
+    session_id: str
+    """
+    A unique string identifier for the session, separate from the
+    database ID.
+    """
+    group_id: str | None = None
+    """The identifier for a group conversation, if applicable."""
+    agent_ids: list[str] | None = None
+    """A list of agent identifiers participating in the session."""
+    configuration: dict | None = None
     """A dictionary containing any custom configuration for this session."""
 
 
 @dataclass
 class GroupConfiguration:
-    """
-    Represents the configuration for a group of conversations.
-    """
     group_id: str
     """The identifier for the group."""
     agent_list: list[str]
@@ -75,19 +74,15 @@ class MemoryContext:
     """A set of user identifiers for the context."""
     session_id: str
     """The identifier for the session context."""
-    def __eq__(self, other):
-        if not isinstance(other, MemoryContext):
-            return False
-        return (
-            self.group_id == other.group_id
-            and self.session_id == other.session_id
-        )
+    hash_str: str
+    """
+    A pre-computed string representation of the context for hashing
+    and dictionary keys.
+    """
 
     def __hash__(self):
-        return hash(
-            f"""{len(self.group_id)}#{self.group_id}_
-            {len(self.session_id)}#{self.session_id}"""
-        )
+        """Computes the hash of the context based on the hash_str."""
+        return hash(self.hash_str)
 
 
 @dataclass(kw_only=True)
