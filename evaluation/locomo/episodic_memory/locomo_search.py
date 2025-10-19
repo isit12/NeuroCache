@@ -94,6 +94,7 @@ async def process_question(
             group_id=group_id,
             session_id=group_id,
             user_id=[user],
+            config_path="locomo_config.yaml",
         ),
     )
 
