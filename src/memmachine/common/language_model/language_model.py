@@ -46,12 +46,12 @@ class LanguageModel(ABC):
                 A tuple containing the generated response text
                 and tool call outputs (if any).
 
+
         Raises:
-            ExternalServiceAPIError:
-                Errors from the underlying embedding API.
+            IOError:
+                If IO error happens. The IO errors can include: Netowrk Error,
+                Rate Litmit, Timeout, etc.
             ValueError:
-                Invalid input or max_attempts.
-            RuntimeError:
-                Catch-all for any other errors.
+                Any other errors except the IOError.
         """
         raise NotImplementedError
