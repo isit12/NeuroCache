@@ -8,8 +8,6 @@ to enable AI agents with persistent memory capabilities.
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-import requests
-
 from memmachine import MemMachineClient
 
 if TYPE_CHECKING:
@@ -81,17 +79,10 @@ class MemMachineTools:
 
         """
         # Get or create project
-        try:
-            project = self.client.get_project(
-                org_id=org_id or self.org_id,
-                project_id=project_id or self.project_id,
-            )
-        except requests.RequestException:
-            # Project doesn't exist, create it
-            project = self.client.create_project(
-                org_id=org_id or self.org_id,
-                project_id=project_id or self.project_id,
-            )
+        project = self.client.get_or_create_project(
+            org_id=org_id or self.org_id,
+            project_id=project_id or self.project_id,
+        )
 
         return project.memory(
             group_id=group_id or self.group_id,
@@ -224,7 +215,7 @@ class MemMachineTools:
                 # Extract episodic memories
                 if results.get("episodic_memory"):
                     episodic = results["episodic_memory"]
-                    if isinstance(episodic, list) and len(episodic) > 0:
+                    if isinstance(episodic, list) and episodic:
                         if isinstance(episodic[0], list):
                             formatted_results["episodic_memory"] = episodic[0]
                         else:
