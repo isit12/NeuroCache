@@ -1,182 +1,228 @@
-# MemMachine
+# MemMachine Client
 
-<div align="center">
+A Python client library for the MemMachine memory system.
 
-![MemMachine: Long Term Memory for AI Agents](https://raw.githubusercontent.com/MemMachine/MemMachine/main/assets/img/MemMachine_Hero_Banner.png)
+## Features
 
-**The open-source memory layer for AI agents.**
+- **Simple API**: Easy-to-use interface
+- **Memory Management**: Add and search episodic and profile memories
+- **Context Awareness**: Automatic context retrieval for better responses
+- **Error Handling**: Robust error handling with retry mechanisms
+- **Type Safety**: Full type hints for better development experience
 
-*Stop building stateless agents. Give your AI persistent memory with just 5 lines of code.*
+## Installation
 
-<br/>
+```bash
+# Install from source (for development)
+pip install -e .
 
-![GitHub Release Version](https://img.shields.io/github/v/release/memmachine/memmachine?display_name=release)
-![GitHub License](https://img.shields.io/github/license/MemMachine/MemMachine)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/MemMachine/MemMachine)
-![Discord](https://img.shields.io/discord/1412878659479666810)
-<br/>
-![Docker Pulls](https://img.shields.io/docker/pulls/memmachine/memmachine)
-![GitHub Downloads](https://img.shields.io/github/downloads/memmachine/memmachine/total?label=GitHub%20Downloads)
-<br/>
-![PyPI Downloads - memmachine-client](https://img.shields.io/pypi/dm/memmachine-client?label=PyPI%20Downloads%3A%20memmachine-client)
-![PyPI Downloads - memmachine-server](https://img.shields.io/pypi/dm/memmachine-server?label=PyPI%20Downloads%3A%20memmachine-server)
-
-</div>
-
-## What is MemMachine?
-
-MemMachine is an open-source **long-term memory layer** for AI agents and LLM-powered applications. It enables your AI to **learn, store, and recall** information from past sessions—transforming stateless chatbots into personalized, context-aware assistants.
-
-### Key Capabilities
-
-- **Episodic Memory**: Graph-based conversational context that persists across sessions
-- **Profile Memory**: Long-term user facts and preferences stored in SQL
-- **Working Memory**: Short-term context for the current session
-- **Agent Memory Persistence**: Memory that survives restarts, sessions, and even model changes
+# Or install dependencies
+pip install requests urllib3
+```
 
 ## Quick Start
 
-Get up and running in under 5 minutes:
-
-> **Prerequisites:** This code requires a running MemMachine Server.  
-> [Start a server locally](https://docs.memmachine.ai/getting_started/quickstart) or create a free account on the [MemMachine Platform](https://console.memmachine.ai/).
-
-```bash
-pip install memmachine-client
-```
+### Basic Usage
 
 ```python
-from memmachine import MemMachineClient
+from memmachine_client import MemMachineClient
 
-# Initialize the client
-client = MemMachineClient(base_url="http://localhost:8080")
-
-# Get or create a project
-project = client.get_or_create_project(org_id="my_org", project_id="my_project")
-
-# Create a memory instance for a user session
-memory = project.memory(
-    group_id="default",
-    agent_id="travel_agent",
-    user_id="alice",
-    session_id="session_001"
+# Initialize client
+client = MemMachineClient(
+    base_url="http://localhost:8080",
+    timeout=30
 )
 
-# Add a memory
-memory.add("I prefer aisle seats on flights", metadata={"category": "travel"})
-# => [AddMemoryResult(uid='...')]
+# Create a memory instance
+memory = client.memory(
+    group_id="my_group",
+    agent_id="my_agent",
+    user_id="user123",
+    session_id="session456"
+)
+
+# Add memories
+memory.add("I like pizza", metadata={"type": "preference"})
+memory.add("I work as a software engineer", metadata={"type": "fact"})
 
 # Search memories
-results = memory.search("What are my flight preferences?")
-print(results.content.episodic_memory.long_term_memory.episodes[0].content)
-# => "I prefer aisle seats on flights"
+results = memory.search("What do I like to eat?")
+print(results)
 ```
 
-For full installation options (Docker, self-hosted, cloud), visit the
-[Quick Start Guide](https://docs.memmachine.ai/getting_started/quickstart).
+## API Reference
 
-## Integrations
+### MemMachineClient
 
-MemMachine works seamlessly with your favorite AI frameworks:
+The main client class for interacting with MemMachine.
 
-<div align="center">
+#### Constructor
 
-| Framework | Description |
-|-----------|-------------|
-| [**LangChain**](integrations/langchain/) | Memory provider for LangChain agents |
-| [**LangGraph**](integrations/langgraph/) | Stateful memory for LangGraph workflows |
-| [**CrewAI**](integrations/crewai/) | Persistent memory for CrewAI multi-agent systems |
-| [**LlamaIndex**](integrations/llamaindex/) | Memory integration for LlamaIndex applications |
-| [**AWS Strands**](integrations/aws_strands_agent_sdk/) | Memory for AWS Strands Agent SDK |
-| [**n8n**](integrations/n8n/) | No-code workflow automation integration |
-| [**Dify**](integrations/dify/) | Memory backend for Dify AI applications |
-| [**FastGPT**](integrations/fastgpt/) | Integration with FastGPT platform |
+```python
+MemMachineClient(
+    api_key: Optional[str] = None,
+    base_url: str = "http://localhost:8080",
+    timeout: int = 30,
+    max_retries: int = 3,
+    **kwargs
+)
+```
 
-</div>
+#### Methods
 
-## MCP Server Support
+- `memory(group_id, agent_id, user_id, session_id)` - Create a Memory instance
+- `health_check()` - Check server health
 
-MemMachine includes a native **Model Context Protocol (MCP)** server for seamless integration with Claude Desktop, Cursor, and other MCP-compatible clients:
+### Memory
+
+Interface for managing episodic and profile memory.
+
+#### Methods
+
+- `add(content, producer, produced_for, episode_type, metadata)` - Add a memory
+- `search(query, limit, filter_dict)` - Search memories
+- `get_context()` - Get current context
+
+## Examples
+
+### Basic Memory Operations
+
+```python
+from memmachine_client import MemMachineClient
+
+client = MemMachineClient(base_url="http://localhost:8080")
+
+# Create memory instance
+memory = client.memory(
+    group_id="demo_group",
+    agent_id="demo_agent",
+    user_id="user123",
+    session_id="demo_session"
+)
+
+# Add memories with metadata
+memory.add("I like pizza", metadata={"type": "preference", "category": "food"})
+memory.add("I work as a software engineer", metadata={"type": "fact", "category": "work"})
+
+# Search memories
+results = memory.search("What do I like to eat?")
+print(f"Episodic memory: {results.get('episodic_memory', [])}")
+print(f"Profile memory: {results.get('profile_memory', [])}")
+
+# Search with filters
+work_results = memory.search("Tell me about work", filter_dict={"category": "work"})
+print(f"Work results: {work_results}")
+```
+
+### Multiple Users
+
+```python
+from memmachine_client import MemMachineClient
+
+client = MemMachineClient(base_url="http://localhost:8080")
+
+# Create memory instances for multiple users
+users = ["alice", "bob", "charlie"]
+memories = {}
+
+for user in users:
+    memories[user] = client.memory(
+        group_id="team_group",
+        agent_id="team_agent",
+        user_id=user
+    )
+
+# Add user-specific memories
+memories["alice"].add("I'm a frontend developer", metadata={"role": "frontend"})
+memories["bob"].add("I'm a backend developer", metadata={"role": "backend"})
+memories["charlie"].add("I'm a DevOps engineer", metadata={"role": "devops"})
+
+# Search across users
+for user, memory in memories.items():
+    results = memory.search("What is your role?")
+    print(f"{user}: {results}")
+```
+
+### Error Handling
+
+```python
+from memmachine_client import MemMachineClient
+
+try:
+    client = MemMachineClient(base_url="http://localhost:8080")
+
+    # Check server health
+    health = client.health_check()
+    print(f"Server health: {health}")
+
+    # Create memory instance
+    memory = client.memory(
+        group_id="demo_group",
+        agent_id="demo_agent",
+        user_id="user123"
+    )
+
+    # Add memory
+    memory.add("Test memory")
+
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### Context Manager Usage
+
+```python
+from memmachine_client import MemMachineClient
+
+# Use client as context manager
+with MemMachineClient(base_url="http://localhost:8080") as client:
+    memory = client.memory(
+        group_id="demo_group",
+        agent_id="demo_agent",
+        user_id="user123"
+    )
+
+    memory.add("This is a test memory")
+    results = memory.search("test")
+    print(f"Results: {results}")
+
+# Client is automatically closed
+```
+
+## Configuration
+
+### Environment Variables
+
+- `MEMORY_BACKEND_URL`: Base URL for MemMachine server (default: http://localhost:8080)
+- `MEMORY_API_KEY`: API key for authentication (optional for local development)
+
+### Client Configuration
+
+```python
+client = MemMachineClient(
+    api_key="your_api_key",  # Optional
+    base_url="http://localhost:8080",
+    timeout=30,  # Request timeout in seconds
+    max_retries=3  # Maximum retries for failed requests
+)
+```
+
+<!-- Comparison section removed: no external product references -->
+
+## Running Examples
 
 ```bash
-# Stdio mode (for Claude Desktop)
-memmachine-mcp-stdio
+# Start MemMachine server first
+python -m memmachine_server.server.app
 
-# HTTP mode (for web clients)
-memmachine-mcp-http
+# Run examples
+python examples/memmachine_client_example.py
 ```
-
-See the [MCP documentation](https://docs.memmachine.ai/integrations/mcp) for setup instructions.
-
-## Who Is MemMachine For?
-
-- **Developers** building AI agents, assistants, or autonomous workflows
-- **Researchers** experimenting with agent architectures and cognitive models
-- **Teams** who need persistent, cross-session memory for their LLM applications
-
-## Key Features
-
-- **Multiple Memory Types**: Working (short-term), Episodic (long-term conversational), and Profile (user facts) memory
-- **Developer-Friendly APIs**: Python SDK, RESTful API, TypeScript SDK, and MCP server interfaces
-- **Flexible Storage**: Graph database (Neo4j) for episodic memory, SQL for profiles
-- **LLM Agnostic**: Works with OpenAI, Anthropic, Bedrock, Ollama, and any LLM provider
-- **Self-Hosted or Cloud**: Run locally, in Docker, or use our managed service
-
-For more information, refer to the [API Reference Guide](https://docs.memmachine.ai/api_reference).
-
-## Architecture
-
-<div align="center">
-
-![MemMachine Architecture](https://raw.githubusercontent.com/MemMachine/MemMachine/main/assets/img/MemMachine_Architecture.png)
-
-</div>
-
-1. **Agents interact via the API Layer**: Users interact with an agent, which connects to MemMachine through a RESTful API, Python SDK, or MCP Server.
-2. **MemMachine manages memory**: Processes interactions and stores them as Episodic Memory (conversational context) and Profile Memory (long-term user facts).
-3. **Data is persisted**: Episodic memory is stored in a graph database; profile memory is stored in SQL.
-
-## Use Cases & Example Agents
-
-MemMachine's versatile memory architecture can be applied across any domain. Explore our [examples](examples/README.md) to see memory-powered agents in action:
-
-| Agent | Description |
-|-------|-------------|
-| **CRM Agent** | Recalls client history and deal stages to help sales teams close faster |
-| **Healthcare Navigator** | Remembers medical history and tracks treatment progress |
-| **Personal Finance Advisor** | Stores portfolio preferences and risk tolerance for personalized insights |
-| **Writing Assistant** | Learns your style guide and terminology for consistent content |
-
-## Built with MemMachine
-
-Are you using MemMachine in your project? We'd love to feature you!
-
-- Share your project in [GitHub Discussions → Showcase](https://github.com/MemMachine/MemMachine/discussions/categories/showcase)
-- Drop a message in our [Discord #showcase channel](https://discord.gg/usydANvKqD)
-
-## Growing Community
-
-MemMachine is a growing community of builders and developers. Help us grow by clicking the ⭐ **Star** button above!
-
-<img src="https://starchart.cc/MemMachine/MemMachine.svg?variant=light" alt="MemMachine Star History" height="300"/>
-
-## Documentation
-
-- **[Main Website](https://memmachine.ai)** – Learn about MemMachine
-- **[Docs & API Reference](https://docs.memmachine.ai)** – Full documentation
-- **[Quick Start Guide](https://docs.memmachine.ai/getting_started/quickstart)** – Get started in minutes
-
-## Community & Support
-
-- **Discord**: Join our community for support, updates, and discussions:
-    [https://discord.gg/usydANvKqD](https://discord.gg/usydANvKqD)
-- **Issues & Feature Requests**: Use GitHub
-    [Issues](https://github.com/MemMachine/MemMachine/issues)
 
 ## Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ## License
 
-MemMachine is released under the [Apache 2.0 License](LICENSE).
+This project is licensed under the same license as MemMachine.
